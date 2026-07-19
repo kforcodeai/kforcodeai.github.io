@@ -1,0 +1,82 @@
+---
+import AboutHeroImage from '../assets/blog-placeholder-about.jpg';
+import Layout from '../layouts/BlogPost.astro';
+---
+
+<Layout
+	title="About"
+	description="Kaushal Prajapati — Staff AI/ML Engineer building agent runtimes, harnesses, evals, and MCP developer platforms. 8+ years shipping production AI, with publications at EMNLP 2024 and Elsevier ASOC."
+	pubDate={new Date('2026-07-19')}
+	heroImage={AboutHeroImage}
+>
+	<p>
+		I'm <strong>Kaushal Kumar Prajapati</strong>, a Staff AI/ML Engineer with 8+ years turning
+		research-grade models into production platforms that serve millions of people. I work on the
+		system layer behind AI products — the <strong
+			>runtime, agent harness, evals, and developer surface</strong
+		> that most demos skip but every real product depends on.
+	</p>
+
+	<h2>What I'm doing now</h2>
+	<p>
+		At <strong>HighLevel</strong>, I set platform direction and architected the unified AI runtime and
+		agent harness — the shared execution layer behind Voice AI, Conversation AI, Agent Studio, Ask AI,
+		Ads Copilot, and the Email Agent. It runs <strong>15M+ conversations and 800B+ tokens per
+		quarter</strong> across 250K+ active locations at 99.9% success. I also built HighLevel's headless
+		developer platform — an MCP server, agent SDK, CLI, and plugin system exposing
+		<strong>600+ operations</strong> so anyone can automate via Claude, ChatGPT, Cursor, or any standard
+		agent, with no UI.
+	</p>
+
+	<h2>Before this</h2>
+	<ul>
+		<li>
+			<strong>Zania AI</strong> — Applied AI Engineer on compliance agents (SOC 2, NIST, HIPAA,
+			TPRA). Pushed evidence-retrieval F1@10 from 86% to 97% with hybrid retrieval, reranking, and
+			citation-span ranking; built post-training and eval release gates.
+		</li>
+		<li>
+			<strong>Intellect AI</strong> — Lead ML Engineer. Led commercialization of an Underwriting
+			Copilot (multi-agent Document AI), replaced 23+ document-specific models with one layout-aware
+			extraction architecture, and cut AWS Textract spend 70% across 6M+ PDFs.
+		</li>
+		<li>
+			<strong>First American (Eagle Labs)</strong> — R&amp;D Engineer. Parcel-level risk models that
+			cut title-insurance claims 17%, and Plymouth, a document-classification framework for 2M+ docs
+			across 1,400+ classes.
+		</li>
+	</ul>
+
+	<h2>Research</h2>
+	<ul>
+		<li>
+			<strong>EMNLP 2024</strong> — De-Identification of Sensitive Personal Data in
+			IIT-CDIP-Derived Datasets.
+			<a href="https://aclanthology.org/2024.emnlp-main.1198/">aclanthology.org</a>
+		</li>
+		<li>
+			<strong>Elsevier ASOC</strong> — Parameter-Efficient Fine-Tuning for Hospital Discharge
+			Summarization.
+			<a href="https://www.sciencedirect.com/science/article/pii/S1568494624003053">sciencedirect.com</a>
+		</li>
+		<li>
+			<strong>Elsevier ASOC</strong> — DoRA+: Enhancing Weight-Decomposed Low-Rank Adaptation.
+			<a href="https://www.sciencedirect.com/science/article/pii/S1568494626013098">sciencedirect.com</a>
+		</li>
+	</ul>
+
+	<h2>Toolbox</h2>
+	<p>
+		Python · TypeScript · PyTorch · Hugging Face · FastAPI · Node.js · vLLM · LoRA/QLoRA/PEFT ·
+		MCP · RAG · evals · AWS/GCP/Azure · Docker · Kubernetes · Postgres · Redis · OpenSearch.
+	</p>
+
+	<h2>Get in touch</h2>
+	<p>
+		I write here about building production AI systems. If that's your world too — or you're hiring
+		for Staff/Principal AI platform work — reach me on
+		<a href="https://www.linkedin.com/in/kforcode/">LinkedIn</a>, over
+		<a href="mailto:kaushalcse07@gmail.com">email</a>, or find my code on
+		<a href="https://github.com/kforcodeai">GitHub</a>.
+	</p>
+</Layout>

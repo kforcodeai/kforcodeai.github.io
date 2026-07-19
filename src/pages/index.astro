@@ -1,0 +1,198 @@
+---
+import { getCollection } from 'astro:content';
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import FormattedDate from '../components/FormattedDate.astro';
+import Header from '../components/Header.astro';
+import { AUTHOR, SITE_DESCRIPTION, SITE_TITLE } from '../consts';
+
+const posts = (await getCollection('blog'))
+	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+	.slice(0, 4);
+
+const highlights = [
+	['15M+', 'conversations & 800B+ tokens per quarter on the AI runtime I architected at HighLevel'],
+	['600+', 'operations exposed over MCP in the headless developer platform I built (mcp · sdk · cli · plugins)'],
+	['4.7M+', 'real-time voice conversations served at 99.9%+ success'],
+	['3', 'peer-reviewed publications (EMNLP 2024 · Elsevier ASOC ×2)'],
+];
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`${SITE_TITLE} · Staff AI/ML Engineer`} description={SITE_DESCRIPTION} />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<section class="hero">
+				<p class="eyebrow">Staff AI/ML Engineer · 8+ years</p>
+				<h1>I build the system layer that makes AI products actually work.</h1>
+				<p class="lede">
+					I'm Kaushal. I design and ship the unglamorous layer most AI demos skip — <strong
+						>agent runtimes, harnesses, evals, and developer platforms</strong
+					> — the infrastructure that makes AI reliable, safe, and easy to build on at scale.
+				</p>
+				<div class="cta">
+					<a class="btn" href="/blog">Read the writing →</a>
+					<a class="btn ghost" href="/about">About me</a>
+				</div>
+				<p class="links">
+					<a href={AUTHOR.github}>GitHub</a> ·
+					<a href={AUTHOR.linkedin}>LinkedIn</a> ·
+					<a href={`mailto:${AUTHOR.email}`}>Email</a>
+				</p>
+			</section>
+
+			<section class="highlights">
+				{
+					highlights.map(([stat, label]) => (
+						<div class="stat">
+							<span class="num">{stat}</span>
+							<span class="label">{label}</span>
+						</div>
+					))
+				}
+			</section>
+
+			<section class="what">
+				<h2>What I work on</h2>
+				<p>
+					Currently at <strong>HighLevel</strong>, where I architected the unified AI runtime and
+					agent harness behind 6+ product surfaces (Voice AI, Conversation AI, Agent Studio, Ask AI,
+					Ads Copilot, Email Agent). Previously: compliance agents at <strong>Zania</strong> (evidence
+					retrieval F1@10 86% → 97%) and a unified Document AI extraction stack at <strong
+						>Intellect</strong
+					> (replaced 23+ models, cut OCR spend 70%). I care about the boundary where ML research
+					meets production systems — model routing, tool calling, long-context state, memory, eval
+					gates, and the reliability engineering that keeps it all up.
+				</p>
+			</section>
+
+			<section class="writing">
+				<h2>Latest writing</h2>
+				{posts.length === 0 && <p>New posts landing soon.</p>}
+				<ul>
+					{
+						posts.map((post) => (
+							<li>
+								<a href={`/blog/${post.id}/`}>
+									<span class="post-title">{post.data.title}</span>
+									<FormattedDate date={post.data.pubDate} />
+								</a>
+							</li>
+						))
+					}
+				</ul>
+				<p><a href="/blog">All posts →</a></p>
+			</section>
+		</main>
+		<Footer />
+		<style>
+			.eyebrow {
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				font-size: 0.8em;
+				color: rgb(var(--gray));
+				margin-bottom: 0.5em;
+			}
+			.hero h1 {
+				font-size: 2.6em;
+				line-height: 1.1;
+				margin-bottom: 0.4em;
+			}
+			.lede {
+				font-size: 1.15em;
+				color: rgb(var(--gray-dark));
+			}
+			.cta {
+				display: flex;
+				gap: 0.75em;
+				flex-wrap: wrap;
+				margin: 1.5em 0 0.75em;
+			}
+			.btn {
+				display: inline-block;
+				padding: 0.55em 1.1em;
+				border-radius: 8px;
+				background: var(--accent);
+				color: #fff;
+				text-decoration: none;
+				font-weight: 700;
+			}
+			.btn.ghost {
+				background: transparent;
+				color: var(--accent);
+				border: 1px solid var(--accent);
+			}
+			.links {
+				color: rgb(var(--gray));
+				font-size: 0.95em;
+			}
+			.highlights {
+				display: grid;
+				grid-template-columns: repeat(2, 1fr);
+				gap: 1.25em;
+				margin: 2.5em 0;
+				padding: 1.5em;
+				background: #fff;
+				border-radius: 12px;
+				box-shadow: var(--box-shadow);
+			}
+			.stat {
+				display: flex;
+				flex-direction: column;
+			}
+			.stat .num {
+				font-size: 1.8em;
+				font-weight: 700;
+				color: var(--accent);
+				line-height: 1;
+			}
+			.stat .label {
+				font-size: 0.85em;
+				color: rgb(var(--gray-dark));
+				margin-top: 0.35em;
+			}
+			.writing ul {
+				list-style: none;
+				padding: 0;
+			}
+			.writing li {
+				border-bottom: 1px solid rgb(var(--gray-light));
+			}
+			.writing li a {
+				display: flex;
+				justify-content: space-between;
+				align-items: baseline;
+				gap: 1em;
+				padding: 0.7em 0;
+				text-decoration: none;
+				color: rgb(var(--gray-dark));
+			}
+			.writing li a:hover .post-title {
+				color: var(--accent);
+			}
+			.writing .post-title {
+				font-weight: 700;
+			}
+			.writing time {
+				color: rgb(var(--gray));
+				font-size: 0.85em;
+				white-space: nowrap;
+			}
+			section {
+				margin-bottom: 2.5em;
+			}
+			@media (max-width: 720px) {
+				.hero h1 {
+					font-size: 2em;
+				}
+				.highlights {
+					grid-template-columns: 1fr;
+				}
+			}
+		</style>
+	</body>
+</html>
