@@ -40,7 +40,7 @@ ${postLines}
 - HighLevel — Staff Software Engineer, AI Platform — Dallas, TX / Remote — Jul 2025 to Present.
 - Zania AI — Applied AI Engineer, Compliance Agents — San Francisco, CA / Remote — Nov 2024 to Jun 2025.
 - Intellect AI, Intellect Design Arena — Lead Machine Learning Engineer — Bengaluru, India / Remote — Sep 2021 to Nov 2024.
-- Eagle Labs, First American India — Research & Development Engineer — Bengaluru, India / Remote — Jul 2018 to Sep 2021.
+- Eagle Labs, First American India — Research & Development Engineer — Bengaluru, India — Jul 2018 to Sep 2021.
 
 ## Selected Zania AI work
 - Enterprise compliance agents: Built autonomous agents and document Q&A systems for SOC 2, NIST, HIPAA, third-party risk assessments, and security questionnaire automation.
