@@ -5,13 +5,156 @@ import Header from '../components/Header.astro';
 import SectionHead from '../components/SectionHead.astro';
 import { AUTHOR, PAPERS, SITE_KEYWORDS } from '../consts';
 
-const description = 'Kaushal Prajapati is a Staff AI/ML Engineer with 8+ years building production agent runtimes, evals, retrieval, MCP platforms, and Document AI systems.';
+const description = 'Kaushal Prajapati is a Staff AI/ML Engineer with 8+ years building enterprise agentic systems, RAG, LLM orchestration, Document AI, GraphRAG, OCR, and ML platforms.';
 
 const timeline = [
 	{ org: 'HighLevel', role: 'Staff AI/ML Engineer', time: 'now', body: 'Architected the unified AI runtime and agent harness behind six AI product surfaces. The platform carries 15M+ conversations and 800B+ tokens per quarter. Also built a headless developer platform with an MCP server, SDK, CLI, and plugin system exposing 600+ operations.', impact: '6+ products · 99.9% success' },
-	{ org: 'Zania AI', role: 'Applied AI Engineer', time: 'previous', body: 'Built Auto Compliance Agents for SOC 2, NIST, HIPAA, and third-party risk. Improved evidence-retrieval F1@10 from 86% to 97% using hybrid retrieval, reranking, citation-span ranking, post-training, and eval release gates.', impact: '86% → 97% F1@10' },
-	{ org: 'Intellect AI', role: 'Lead ML Engineer', time: 'previous', body: 'Led commercialization of an Underwriting Copilot. Replaced 23+ document-specific models with one layout-aware extraction architecture and cut AWS Textract spend 70% across 6M+ PDFs.', impact: '23 models → 1 system' },
-	{ org: 'First American · Eagle Labs', role: 'R&D Engineer', time: 'earlier', body: 'Built parcel-level risk models that cut title-insurance claims 17%, plus a document-classification framework for 2M+ documents across more than 1,400 classes.', impact: '17% fewer claims' },
+	{ org: 'Zania AI', role: 'Applied AI Engineer', time: 'Nov 2024 – present', body: 'Built enterprise compliance and cybersecurity automation using autonomous agents, retrieval-augmented generation, document question answering, and scalable LLM job orchestration.', impact: 'enterprise compliance AI' },
+	{ org: 'Intellect AI · Intellect Design Arena', role: 'Senior Project Lead · Senior ML Engineer', time: 'Sep 2021 – Nov 2024', body: 'Progressed across two roles, taking Document AI, underwriting, graph intelligence, and information-extraction systems from model architecture through multi-client commercialization.', impact: '2 roles · product + platform' },
+	{ org: 'First American · Eagle Labs', role: 'R&D Engineer', time: 'earlier', body: 'Built production systems across document intake, understanding, verification, property risk, data security, and customer intelligence for the title and escrow lifecycle.', impact: '7 production systems' },
+];
+
+const selectedRoles = [
+	{
+		code: 'ZA',
+		org: 'Zania AI',
+		role: 'Applied AI Engineer',
+		location: 'San Francisco · remote',
+		period: 'Nov 2024 – present',
+		description: 'Enterprise compliance and cybersecurity automation built on autonomous agents, RAG, and document question answering.',
+		impact: ['86% → 97% F1@10', 'days → hours', 'largest-client retention'],
+		bullets: [
+			'Built autonomous agents and intelligent bots that automated SOC 2 and NIST workflows, third-party risk assessments (TPRA), and security questionnaires using LLMs, RAG, and document question answering.',
+			'Raised evidence-retrieval F1@10 from 86% to 97%; the improvement directly prevented churn of Zania\'s largest enterprise client.',
+			'Designed and deployed asynchronous LLM job orchestration with Azure Service Bus and Redis, including global rate limiting for high-concurrency workloads.',
+			'Developed a cybersecurity-documentation multi-agent system for Netflix that reduced delivery SLA from days to hours.',
+		],
+		tools: ['OpenAI', 'Anthropic', 'LLMs', 'RAG', 'Azure Service Bus', 'Redis', 'Document Q&A', 'Python', 'SOC 2', 'Azure API Management', 'LangChain', 'LlamaIndex', 'Mem0'],
+	},
+	{
+		code: 'IA',
+		org: 'Intellect AI · Intellect Design Arena',
+		role: 'Senior Project Lead',
+		location: 'Bengaluru, India',
+		period: 'Sep 2022 – Nov 2024',
+		description: 'Commercialized Underwriting CoPilot and built the ingestion, model, graph, and routing systems behind enterprise underwriting intelligence.',
+		impact: ['6M+ PDFs', '70% lower OCR cost', '73% → 79% F1'],
+		bullets: [
+			'Commercialized Underwriting CoPilot, a multi-agent RAG system that gave underwriters contextual document understanding and dynamically generated risk summaries.',
+			'Engineered layout-aware chunking and document-ingestion microservices that processed more than 6 million PDFs while cutting AWS Textract costs by 70%.',
+			'Fine-tuned 7B-parameter LLMs on domain-specific corpora, improving zero-shot generalization F1 on unseen document types from 73% to 79%.',
+			'Developed an end-to-end NLP pipeline for meeting-transcript analysis that populated Neo4j knowledge graphs with entities, speaker context, relationships, and topics.',
+			'Added natural-language-to-Cypher conversion so users could run analytical graph workflows without writing Cypher queries.',
+			'Implemented an intent-aware query router that selected Boolean, full-text, vector, or LLM pipelines, avoiding unnecessary high-capability model and vector-database calls.',
+			'Applied GraphRAG to title-chain and claims graphs to detect fraud patterns and suspicious relationships.',
+		],
+		tools: ['Multi-agent systems', 'Query routing', 'RAG', 'AWS Textract', '7B LLMs', 'Neo4j', 'Text-to-Cypher', 'Text-to-SQL', 'PyTorch', 'GraphRAG', 'AWS Lambda', 'AWS SQS', 'AWS S3', 'Docker', 'OpenAI', 'AWS Bedrock', 'Unsloth', 'Hugging Face', 'LangChain', 'LlamaIndex', 'LangGraph', 'LangFlow', 'LangSmith', 'YOLOv8', 'Table Transformer', 'Reading-order detection', 'Speech-to-Text'],
+	},
+	{
+		code: 'IA',
+		org: 'Intellect AI · Intellect Design Arena',
+		role: 'Senior Machine Learning Engineer',
+		location: 'Bengaluru, India',
+		period: 'Sep 2021 – Sep 2022',
+		description: 'Unified and productized a layout-aware intelligent document processing platform for enterprise clients.',
+		impact: ['23+ → 1 model', '4× sales growth', '60% shorter cycles'],
+		bullets: [
+			'Built a unified, layout-aware information-extraction model that replaced 23+ legacy ML pipelines, reducing deployment complexity and technical debt.',
+			'Productized the intelligent document processing service, enabling 4× sales growth and onboarding six new enterprise clients.',
+			'Developed a human-in-the-loop data-labeling system that reduced annotation and model-retraining cycles by 60%.',
+			'Created modular OCR pipelines with document-type-aware routing to the most suitable OCR backend.',
+		],
+		tools: ['Object detection', 'AWS SageMaker', 'Hugging Face', 'DeepSpeed', 'ONNX', 'Evidently', 'MLflow', 'Kubeflow', 'OCR', 'HITL systems', 'Document processing', 'Information extraction', 'Python', 'ML pipelines'],
+	},
+];
+
+const eagleProjects = [
+	{
+		name: 'Customized OCR Pipeline',
+		description: 'A text-detection and recognition pipeline for scanned PDFs.',
+		impact: ['2% CER on VINs', 'GEM of the Year'],
+		tags: ['OCR', 'Document AI', 'API design', 'benchmarking'],
+		bullets: [
+			'Developed a reusable text-detection and recognition pipeline and library, reaching a 2% character error rate (CER) on vehicle identification numbers.',
+			'Benchmarked the pipeline against Tesseract, PaddleOCR, and AWS Textract.',
+			'Built a preprocessing API that analyzed each document and selected the most suitable OCR engine.',
+			'Removed AWS Textract dependencies from multiple services, reducing infrastructure costs and the price of downstream service offerings.',
+			'Improved the performance of document-classification and information-extraction services across multiple applications.',
+		],
+	},
+	{
+		name: 'Financial Document Understanding Platform',
+		description: 'A platform for identifying and extracting information from financial and legal documents.',
+		impact: ['2M+ documents', '1,400+ categories', '70% faster SLA', '34% lower costs'],
+		tags: ['BERT', 'LayoutLM', 'NER', 'table extraction'],
+		bullets: [
+			'Developed a large-scale data pipeline to classify more than 2 million documents across 1,400+ categories.',
+			'Worked on layout analysis, table detection and extraction, form understanding, and free-text clustering.',
+			'Built information-extraction workflows using BERT for named-entity recognition in unstructured documents and LayoutLM for structured documents.',
+			'Reduced single-document processing SLA by 70% and helped reduce extraneous escrow staffing and service costs by 34%.',
+			'Received the Best Employee Quarterly award for the platform\'s impact.',
+		],
+	},
+	{
+		name: 'Exploring Variations in Large Document Corpus',
+		description: 'A pipeline for finding distinct layout variations in large document corpora.',
+		impact: ['layout discovery', 'corpus-scale clustering'],
+		tags: ['embeddings', 'clustering', 'layout analysis'],
+		bullets: [
+			'Experimented with visual and structural representations to identify the most effective embeddings for document-layout variation.',
+			'Researched and evaluated clustering algorithms for grouping unique layout families at corpus scale.',
+		],
+	},
+	{
+		name: 'E-Signing & Notarization',
+		description: 'A signature and notary detection, extraction, and verification toolkit.',
+		impact: ['64% → 87% precision', '70% faster SLA'],
+		tags: ['computer vision', 'verification', 'DocuSign', 'API design'],
+		bullets: [
+			'Designed and implemented a modular, extensible API for signature and notary detection.',
+			'Added a false-positive removal layer that increased model precision from 64% to 87%.',
+			'Developed an algorithm to validate whether notary seals comply with US state notarization laws.',
+			'Built a data-extraction pipeline for notary seals and integrated the toolkit with DocuSign and First American\'s document-processing platform.',
+			'Reduced signature and notary verification SLA by 70%, helping lower escrow-service costs and increase document-recording revenue.',
+		],
+	},
+	{
+		name: 'Property Risk Profiling',
+		description: 'An AI system for estimating the risk involved in insuring a property.',
+		impact: ['73% → 81% performance', '19% fewer claims'],
+		tags: ['risk modeling', 'geospatial ML', 'ETL', 'GIS'],
+		bullets: [
+			'Developed data pipelines to automate ETL across multiple property and claims data sources.',
+			'Engineered complex geospatial data to discover features influencing a property\'s risk profile.',
+			'Built a regression model, a unified dashboard, and an automated report-delivery system for risk profiling.',
+			'Integrated Google Maps with customized GIS layers to visualize property boundaries.',
+			'Integrated the First American Claims API, improving model performance from 73% to 81% and reducing title-insurance claims by 19%.',
+			'Received the Best Employee Quarterly award for the project\'s impact.',
+		],
+	},
+	{
+		name: 'Data Security Inspector',
+		description: 'A configurable system for identifying and redacting NPI and PII.',
+		impact: ['configurable rules', 'profile-aware redaction'],
+		tags: ['PII', 'NPI', 'data security', 'ETL'],
+		bullets: [
+			'Developed an automated, scalable, and resilient pipeline to replace fragmented ETL processes.',
+			'Enabled end users to define NPI and PII detection rules through a user interface.',
+			'Added profile-aware redaction so sensitive data could be protected according to user access and policy.',
+		],
+	},
+	{
+		name: 'Customer Segmentation',
+		description: 'An ML system for segmenting First American customers using business-defined signals.',
+		impact: ['automated insights', 'stakeholder-ready reports'],
+		tags: ['clustering', 'outlier detection', 'NLG', 'ETL'],
+		bullets: [
+			'Built an ETL pipeline to query the First American Transaction System.',
+			'Evaluated clustering algorithms and created visualizations that made customer segments actionable for stakeholders.',
+			'Automated outlier detection using thresholds and criteria supplied through a user interface.',
+			'Created processes to mine patterns and generate report-ready, business-driving insights in natural language.',
+		],
+	},
 ];
 
 const toolbox = ['Python', 'TypeScript', 'PyTorch', 'Hugging Face', 'FastAPI', 'Node.js', 'vLLM', 'LoRA / QLoRA / PEFT', 'MCP', 'RAG', 'Evals', 'AWS', 'GCP', 'Azure', 'Docker', 'Kubernetes', 'Postgres', 'Redis', 'OpenSearch'];
@@ -31,6 +174,43 @@ const profileLd = {
 		sameAs: [AUTHOR.github, AUTHOR.linkedin, ...PAPERS.map((paper) => paper.url)],
 	},
 };
+
+const projectsLd = {
+	'@context': 'https://schema.org',
+	'@type': 'ItemList',
+	name: 'Selected AI and machine learning projects at First American Eagle Labs',
+	description: 'Production Document AI, OCR, e-signing, risk modeling, data security, and customer intelligence systems built by Kaushal Prajapati.',
+	itemListElement: eagleProjects.map((project, index) => ({
+		'@type': 'ListItem',
+		position: index + 1,
+		item: {
+			'@type': 'CreativeWork',
+			name: project.name,
+			description: `${project.description} ${project.bullets.join(' ')}`,
+			creator: { '@type': 'Person', name: AUTHOR.name, url: AUTHOR.site },
+			about: project.tags,
+		},
+	})),
+};
+
+const selectedWorkLd = {
+	'@context': 'https://schema.org',
+	'@type': 'ItemList',
+	name: 'Selected enterprise AI and machine learning work by Kaushal Prajapati',
+	description: 'Agentic compliance automation, LLM orchestration, underwriting intelligence, GraphRAG, and intelligent document processing work at Zania AI and Intellect AI.',
+	itemListElement: selectedRoles.map((item, index) => ({
+		'@type': 'ListItem',
+		position: index + 1,
+		item: {
+			'@type': 'CreativeWork',
+			name: `${item.role} — ${item.org}`,
+			description: `${item.description} ${item.bullets.join(' ')}`,
+			creator: { '@type': 'Person', name: AUTHOR.name, url: AUTHOR.site },
+			about: item.tools,
+			temporalCoverage: item.period,
+		},
+	})),
+};
 ---
 
 <!doctype html>
@@ -38,6 +218,8 @@ const profileLd = {
 	<head>
 		<BaseHead title="About Kaushal Prajapati · Staff AI/ML Engineer" description={description} ogImage="/og/about.png" />
 		<script type="application/ld+json" set:html={JSON.stringify(profileLd)} />
+		<script type="application/ld+json" set:html={JSON.stringify(selectedWorkLd)} />
+		<script type="application/ld+json" set:html={JSON.stringify(projectsLd)} />
 	</head>
 	<body>
 		<Header />
@@ -79,6 +261,73 @@ const profileLd = {
 						</li>
 					))}
 				</ol>
+			</section>
+
+			<section class="projects" aria-labelledby="selected-role-work-title">
+				<SectionHead net="selected_work · Zania AI / Intellect AI" />
+				<div class="projects-intro">
+					<div>
+						<h2 id="selected-role-work-title">Agents, retrieval, and document intelligence.</h2>
+						<p>Enterprise AI systems that connect model quality to reliability, operating cost, customer retention, and commercial growth.</p>
+					</div>
+				</div>
+
+				<div class="project-list role-list">
+					{selectedRoles.map((item, i) => (
+						<details class="project">
+							<summary>
+								<span class="project-index net">{item.code}::{String(i + 1).padStart(2, '0')}</span>
+								<span class="project-title">
+									<strong>{item.role}</strong>
+									<small>{item.org} · {item.location} · {item.period}</small>
+								</span>
+								<span class="project-impact net">{item.impact.join(' · ')}</span>
+								<span class="project-toggle" aria-hidden="true"></span>
+							</summary>
+							<div class="project-detail role-detail">
+								<div class="project-copy">
+									<p>{item.description}</p>
+									<ul>{item.bullets.map((bullet) => <li>{bullet}</li>)}</ul>
+								</div>
+								<div class="project-tags" aria-label={`${item.role} tools and technologies`}>
+									{item.tools.map((tool) => <span class="chip chip--plain">{tool}</span>)}
+								</div>
+							</div>
+						</details>
+					))}
+				</div>
+			</section>
+
+			<section class="projects" aria-labelledby="eagle-projects-title">
+				<SectionHead net="selected_work · First American / Eagle Labs" />
+				<div class="projects-intro">
+					<div>
+						<h2 id="eagle-projects-title">Applied ML across the title lifecycle.</h2>
+						<p>Seven production systems spanning document intake, understanding, verification, risk, privacy, and customer intelligence.</p>
+					</div>
+				</div>
+
+				<div class="project-list">
+					{eagleProjects.map((project, i) => (
+						<details class="project">
+							<summary>
+								<span class="project-index net">FA::{String(i + 1).padStart(2, '0')}</span>
+								<span class="project-title">
+									<strong>{project.name}</strong>
+									<small>{project.description}</small>
+								</span>
+								<span class="project-impact net">{project.impact.join(' · ')}</span>
+								<span class="project-toggle" aria-hidden="true"></span>
+							</summary>
+							<div class="project-detail">
+								<ul>{project.bullets.map((bullet) => <li>{bullet}</li>)}</ul>
+								<div class="project-tags" aria-label={`${project.name} topics`}>
+									{project.tags.map((tag) => <span class="chip chip--plain">{tag}</span>)}
+								</div>
+							</div>
+						</details>
+					))}
+				</div>
 			</section>
 
 			<section class="toolkit">
@@ -225,6 +474,148 @@ const profileLd = {
 		font-size: 0.88rem;
 	}
 
+	.projects-intro {
+		max-width: 720px;
+		margin-bottom: 2rem;
+	}
+
+	.projects-intro h2 {
+		font-size: 2rem;
+	}
+
+	.projects-intro p {
+		max-width: 680px;
+		margin: 0.75rem 0 0;
+		color: var(--muted);
+		font-size: 0.92rem;
+	}
+
+	.project-list {
+		border-top: 1px solid var(--line);
+	}
+
+	.project {
+		border-bottom: 1px solid var(--line);
+	}
+
+	.project summary {
+		display: grid;
+		grid-template-columns: 72px minmax(0, 1fr) minmax(180px, 0.65fr) 20px;
+		gap: 1.25rem;
+		align-items: center;
+		padding: 1.3rem 0;
+		cursor: pointer;
+		list-style: none;
+	}
+
+	.project summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.project summary:hover .project-title > strong,
+	.project[open] .project-title > strong {
+		color: var(--accent);
+	}
+
+	.project-index {
+		color: var(--accent);
+	}
+
+	.project-title {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+
+	.project-title > strong {
+		font-family: var(--font-display);
+		font-size: 1rem;
+		letter-spacing: -0.02em;
+		transition: color 0.15s var(--ease);
+	}
+
+	.project-title > small {
+		color: var(--muted);
+		font-size: 0.76rem;
+		line-height: 1.5;
+	}
+
+	.project-impact {
+		color: var(--muted);
+		font-size: 0.61rem;
+		line-height: 1.6;
+		text-align: right;
+		text-transform: none;
+	}
+
+	.project-toggle {
+		position: relative;
+		width: 18px;
+		height: 18px;
+	}
+
+	.project-toggle::before,
+	.project-toggle::after {
+		content: '';
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 12px;
+		height: 1px;
+		background: var(--muted);
+		transform: translate(-50%, -50%);
+		transition: transform 0.15s var(--ease);
+	}
+
+	.project-toggle::after {
+		transform: translate(-50%, -50%) rotate(90deg);
+	}
+
+	.project[open] .project-toggle::after {
+		transform: translate(-50%, -50%) rotate(0deg);
+	}
+
+	.project-detail {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 210px;
+		gap: 2.5rem;
+		padding: 0 2.4rem 1.6rem 92px;
+	}
+
+	.project-detail ul {
+		margin: 0;
+		padding-left: 1rem;
+		color: var(--muted);
+		font-size: 0.82rem;
+	}
+
+	.project-copy > p {
+		margin: 0 0 0.85rem;
+		color: var(--ink-soft);
+		font-size: 0.86rem;
+		font-weight: 500;
+	}
+
+	.role-detail {
+		grid-template-columns: minmax(0, 1fr) 280px;
+	}
+
+	.project-detail li {
+		margin-bottom: 0.45rem;
+	}
+
+	.project-detail li::marker {
+		color: var(--accent);
+	}
+
+	.project-tags {
+		display: flex;
+		align-content: flex-start;
+		justify-content: flex-end;
+		gap: 0.4rem;
+		flex-wrap: wrap;
+	}
+
 	.tools {
 		display: flex;
 		gap: 0.45rem;
@@ -288,6 +679,31 @@ const profileLd = {
 
 		.item-head {
 			flex-direction: column;
+		}
+
+		.project summary {
+			grid-template-columns: 55px minmax(0, 1fr) 20px;
+			gap: 0.8rem;
+		}
+
+		.project-impact {
+			grid-column: 2;
+			text-align: left;
+		}
+
+		.project-toggle {
+			grid-column: 3;
+			grid-row: 1 / span 2;
+		}
+
+		.project-detail {
+			grid-template-columns: 1fr;
+			gap: 1rem;
+			padding: 0 0 1.4rem 63px;
+		}
+
+		.project-tags {
+			justify-content: flex-start;
 		}
 	}
 </style>
