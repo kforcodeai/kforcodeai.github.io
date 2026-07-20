@@ -1,0 +1,138 @@
+---
+import FormattedDate from './FormattedDate.astro';
+import { readingTime, type Post } from '../lib/utils';
+
+interface Props {
+	post: Post;
+	index?: number; // schematic node id, e.g. 01
+	variant?: 'card' | 'row';
+}
+const { post, index, variant = 'card' } = Astro.props;
+const { title, description, pubDate, tags } = post.data;
+const mins = readingTime(post.body);
+const id = index != null ? String(index).padStart(2, '0') : undefined;
+---
+
+{
+	variant === 'row' ? (
+		<a href={`/blog/${post.id}/`} class="node node--link row">
+			<div class="row-main">
+				{id && <span class="node-id net">{id}</span>}
+				<span class="row-title">{title}</span>
+			</div>
+			<span class="row-meta net">
+				<FormattedDate date={pubDate} /> · {mins}m
+			</span>
+		</a>
+	) : (
+		<a href={`/blog/${post.id}/`} class="node node--link card">
+			<div class="card-top net">
+				<span>{id ? `NODE::${id}` : 'POST'}</span>
+				<span class="card-mins">{mins} min read</span>
+			</div>
+			<h3 class="card-title">{title}</h3>
+			<p class="card-desc">{description}</p>
+			<div class="card-foot">
+				<div class="card-tags">
+					{(tags ?? []).slice(0, 3).map((t) => (
+						<span class="chip">{t}</span>
+					))}
+				</div>
+				<FormattedDate class="card-date net" date={pubDate} />
+			</div>
+		</a>
+	)
+}
+
+<style>
+	/* Card variant */
+	.card {
+		padding: 1.35rem 1.4rem 1.2rem;
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+	}
+	.card-top {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.85rem;
+		color: var(--muted);
+	}
+	.card-mins {
+		color: var(--accent);
+	}
+	.card-title {
+		font-size: 1.16rem;
+		line-height: 1.22;
+		margin: 0 0 0.5rem;
+		letter-spacing: -0.015em;
+	}
+	.node--link:hover .card-title {
+		color: var(--accent);
+	}
+	.card-desc {
+		color: var(--muted);
+		font-size: 0.94rem;
+		line-height: 1.6;
+		margin: 0 0 1.1rem;
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+	.card-foot {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.75rem;
+		margin-top: auto;
+	}
+	.card-tags {
+		display: flex;
+		gap: 0.4rem;
+		flex-wrap: wrap;
+	}
+	.card-date {
+		white-space: nowrap;
+	}
+
+	/* Row variant */
+	.row {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 1rem;
+		padding: 0.95rem 1.1rem;
+	}
+	.row-main {
+		display: flex;
+		align-items: baseline;
+		gap: 0.8rem;
+		min-width: 0;
+	}
+	.node-id {
+		color: var(--accent);
+		flex: none;
+	}
+	.row-title {
+		font-family: var(--font-display);
+		font-weight: 500;
+		font-size: 1rem;
+		color: var(--ink);
+		letter-spacing: -0.01em;
+	}
+	.node--link:hover .row-title {
+		color: var(--accent);
+	}
+	.row-meta {
+		white-space: nowrap;
+		flex: none;
+	}
+	@media (max-width: 640px) {
+		.row {
+			flex-direction: column;
+			gap: 0.35rem;
+		}
+	}
+</style>

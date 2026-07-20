@@ -1,14 +1,35 @@
 ---
-import { Image } from 'astro:assets';
+import type { MarkdownHeading } from 'astro';
 import type { CollectionEntry } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/Footer.astro';
 import FormattedDate from '../components/FormattedDate.astro';
 import Header from '../components/Header.astro';
 
-type Props = CollectionEntry<'blog'>['data'] & { ogImage?: string };
+type Props = CollectionEntry<'blog'>['data'] & {
+	ogImage?: string;
+	headings?: MarkdownHeading[];
+	minutes?: number;
+	newer?: CollectionEntry<'blog'>;
+	older?: CollectionEntry<'blog'>;
+	related?: CollectionEntry<'blog'>[];
+};
 
-const { title, description, pubDate, updatedDate, heroImage, tags, ogImage } = Astro.props;
+const {
+	title,
+	description,
+	pubDate,
+	updatedDate,
+	tags,
+	ogImage,
+	headings = [],
+	minutes,
+	newer,
+	older,
+	related = [],
+} = Astro.props;
+
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
 ---
 
 <html lang="en">
@@ -16,97 +37,295 @@ const { title, description, pubDate, updatedDate, heroImage, tags, ogImage } = A
 		<BaseHead
 			title={`${title} · Kaushal Prajapati`}
 			description={description}
-			image={heroImage}
 			ogImage={ogImage}
 			type="article"
 			pubDate={pubDate}
 			updatedDate={updatedDate}
 		/>
-		<style>
-			main {
-				width: calc(100% - 2em);
-				max-width: 100%;
-				margin: 0;
-			}
-			.hero-image {
-				width: 100%;
-			}
-			.hero-image img {
-				display: block;
-				margin: 0 auto;
-				border-radius: 12px;
-				box-shadow: var(--box-shadow);
-			}
-			.prose {
-				width: 720px;
-				max-width: calc(100% - 2em);
-				margin: auto;
-				padding: 1em;
-				color: rgb(var(--gray-dark));
-			}
-			.title {
-				margin-bottom: 1em;
-				padding: 1em 0;
-				text-align: center;
-				line-height: 1;
-			}
-			.title h1 {
-				margin: 0 0 0.5em 0;
-			}
-			.date {
-				margin-bottom: 0.5em;
-				color: rgb(var(--gray));
-			}
-			.last-updated-on {
-				font-style: italic;
-			}
-			.tags {
-				margin: 0.75em 0 0 0;
-			}
-			.tag {
-				display: inline-block;
-				margin: 0 0.25em;
-				font-size: 0.8em;
-				color: var(--accent);
-			}
-		</style>
 	</head>
 
 	<body>
 		<Header />
-		<main>
+		<main class="article-layout">
 			<article>
-				<div class="hero-image">
-					{heroImage && <Image width={1020} height={510} src={heroImage} alt={title} />}
-				</div>
-				<div class="prose">
-					<div class="title">
-						<div class="date">
-							<FormattedDate date={pubDate} />
-							{
-								updatedDate && (
-									<div class="last-updated-on">
-										Last updated on <FormattedDate date={updatedDate} />
-									</div>
-								)
-							}
-						</div>
-						<h1>{title}</h1>
+				<header class="article-head">
+					<span class="net kicker">LOG · {tags?.[0] ?? 'writing'}</span>
+					<h1>{title}</h1>
+					<p class="a-desc">{description}</p>
+					<div class="a-meta">
+						<span class="dot"></span>
+						<FormattedDate class="net" date={pubDate} />
+						{minutes && <span class="net">· {minutes} MIN READ</span>}
 						{
-							tags && tags.length > 0 && (
-								<p class="tags">
-									{tags.map((tag: string) => (
-										<span class="tag">#{tag}</span>
-									))}
-								</p>
+							updatedDate && (
+								<span class="net">
+									· UPD <FormattedDate date={updatedDate} />
+								</span>
 							)
 						}
-						<hr />
 					</div>
+					{
+						tags && tags.length > 0 && (
+							<div class="a-tags">
+								{tags.map((tag: string) => (
+									<a class="chip" href={`/tags/${tag}/`}>
+										{tag}
+									</a>
+								))}
+							</div>
+						)
+					}
+				</header>
+
+				<div class="prose">
 					<slot />
 				</div>
+
+				<footer class="article-foot">
+					<a class="net back" href="/blog">← all writing</a>
+				</footer>
 			</article>
+
+			{
+				toc.length > 1 && (
+					<aside class="toc" aria-label="Table of contents">
+						<div class="toc-inner node">
+							<span class="net toc-title">ON THIS PAGE</span>
+							<nav>
+								<ol>
+									{toc.map((h) => (
+										<li class:list={[{ sub: h.depth === 3 }]}>
+											<a href={`#${h.slug}`}>{h.text}</a>
+										</li>
+									))}
+								</ol>
+							</nav>
+						</div>
+					</aside>
+				)
+			}
 		</main>
+
+		{
+			(newer || older || related.length > 0) && (
+				<section class="more wrap">
+					{(newer || older) && (
+						<div class="adjacent">
+							{older ? (
+								<a class="node node--link adj" href={`/blog/${older.id}/`}>
+									<span class="net">← previous</span>
+									<span class="adj-t">{older.data.title}</span>
+								</a>
+							) : (
+								<span />
+							)}
+							{newer && (
+								<a class="node node--link adj adj-r" href={`/blog/${newer.id}/`}>
+									<span class="net">next →</span>
+									<span class="adj-t">{newer.data.title}</span>
+								</a>
+							)}
+						</div>
+					)}
+					{related.length > 0 && (
+						<div class="related">
+							<div class="section-head">
+								<span class="net">SEC::RELATED</span>
+								<span class="rule" />
+							</div>
+							<div class="related-grid">
+								{related.map((p) => (
+									<a class="node node--link rel" href={`/blog/${p.id}/`}>
+										<span class="net">{(p.data.tags ?? [])[0] ?? 'post'}</span>
+										<span class="rel-t">{p.data.title}</span>
+									</a>
+								))}
+							</div>
+						</div>
+					)}
+				</section>
+			)
+		}
 		<Footer />
+
+		<script is:inline>
+			// Add hover anchor links to prose headings (ids provided by Astro).
+			(function () {
+				document.querySelectorAll('.prose h2[id], .prose h3[id]').forEach(function (h) {
+					var a = document.createElement('a');
+					a.href = '#' + h.id;
+					a.className = 'anchor';
+					a.textContent = '#';
+					a.setAttribute('aria-label', 'Link to this section');
+					h.appendChild(a);
+				});
+			})();
+		</script>
+
+		<style>
+			.article-layout {
+				display: grid;
+				grid-template-columns: minmax(0, 44rem) 13rem;
+				justify-content: center;
+				gap: 3.5rem;
+				align-items: start;
+				padding-top: 2.75rem;
+			}
+			article {
+				min-width: 0;
+			}
+			.article-head {
+				margin-bottom: 2.25rem;
+				padding-bottom: 1.75rem;
+				border-bottom: var(--edge) solid var(--line);
+			}
+			.kicker {
+				color: var(--accent);
+			}
+			.article-head h1 {
+				margin: 0.6rem 0 0.6rem;
+			}
+			.a-desc {
+				font-size: 1.12rem;
+				line-height: 1.55;
+				color: var(--ink-soft);
+				margin: 0 0 1.1rem;
+			}
+			.a-meta {
+				display: flex;
+				align-items: center;
+				gap: 0.4rem;
+				flex-wrap: wrap;
+				color: var(--muted);
+				margin-bottom: 1rem;
+			}
+			.a-tags {
+				display: flex;
+				gap: 0.4rem;
+				flex-wrap: wrap;
+			}
+			.article-foot {
+				margin-top: 3rem;
+				padding-top: 1.5rem;
+				border-top: var(--edge) solid var(--line);
+			}
+			.back {
+				text-decoration: none;
+				color: var(--muted);
+			}
+			.back:hover {
+				color: var(--accent);
+			}
+
+			/* TOC */
+			.toc {
+				position: sticky;
+				top: 5rem;
+				align-self: start;
+			}
+			.toc-inner {
+				padding: 1rem 1.1rem;
+			}
+			.toc-title {
+				display: block;
+				margin-bottom: 0.7rem;
+				color: var(--accent);
+			}
+			.toc ol {
+				list-style: none;
+				margin: 0;
+				padding: 0;
+				display: flex;
+				flex-direction: column;
+				gap: 0.5rem;
+			}
+			.toc li.sub {
+				padding-left: 0.9rem;
+			}
+			.toc a {
+				text-decoration: none;
+				color: var(--muted);
+				font-size: 0.85rem;
+				line-height: 1.35;
+				transition: color 0.15s var(--ease);
+			}
+			.toc a:hover {
+				color: var(--accent);
+			}
+
+			/* More / adjacent / related */
+			.more {
+				margin-top: 3.5rem;
+			}
+			.adjacent {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 1rem;
+				margin-bottom: 2.5rem;
+			}
+			.adj {
+				padding: 1.1rem 1.25rem;
+				display: flex;
+				flex-direction: column;
+				gap: 0.4rem;
+			}
+			.adj .net {
+				color: var(--muted);
+			}
+			.adj-r {
+				text-align: right;
+			}
+			.adj-t {
+				font-family: var(--font-display);
+				font-weight: 500;
+				color: var(--ink);
+				letter-spacing: -0.01em;
+			}
+			.node--link:hover .adj-t {
+				color: var(--accent);
+			}
+			.related-grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 1rem;
+			}
+			.rel {
+				padding: 1.1rem 1.25rem;
+				display: flex;
+				flex-direction: column;
+				gap: 0.4rem;
+			}
+			.rel .net {
+				color: var(--accent);
+			}
+			.rel-t {
+				font-family: var(--font-display);
+				font-weight: 500;
+				color: var(--ink);
+				letter-spacing: -0.01em;
+			}
+			.node--link:hover .rel-t {
+				color: var(--accent);
+			}
+
+			@media (max-width: 960px) {
+				.article-layout {
+					grid-template-columns: minmax(0, 44rem);
+					justify-content: center;
+				}
+				.toc {
+					display: none;
+				}
+			}
+			@media (max-width: 640px) {
+				.adjacent,
+				.related-grid {
+					grid-template-columns: 1fr;
+				}
+				.adj-r {
+					text-align: left;
+				}
+			}
+		</style>
 	</body>
 </html>

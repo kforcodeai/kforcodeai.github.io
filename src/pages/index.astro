@@ -2,197 +2,418 @@
 import { getCollection } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/Footer.astro';
-import FormattedDate from '../components/FormattedDate.astro';
 import Header from '../components/Header.astro';
-import { AUTHOR, SITE_DESCRIPTION, SITE_TITLE } from '../consts';
+import PostCard from '../components/PostCard.astro';
+import SectionHead from '../components/SectionHead.astro';
+import { AUTHOR, HIGHLIGHTS, PAPERS, SITE_DESCRIPTION, SITE_TITLE, TOPICS } from '../consts';
+import { byDateDesc } from '../lib/utils';
 
-const posts = (await getCollection('blog'))
-	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
-	.slice(0, 4);
+const posts = (await getCollection('blog')).sort(byDateDesc).slice(0, 4);
 
-const highlights = [
-	['15M+', 'conversations & 800B+ tokens per quarter on the AI runtime I architected at HighLevel'],
-	['600+', 'operations exposed over MCP in the headless developer platform I built (mcp · sdk · cli · plugins)'],
-	['4.7M+', 'real-time voice conversations served at 99.9%+ success'],
-	['3', 'peer-reviewed publications (EMNLP 2024 · Elsevier ASOC ×2)'],
+// The signature system diagram — the runtime I build, as a data flow.
+const flow = [
+	{ net: 'IN', label: 'Prompt', sub: 'user / event' },
+	{ net: 'A0', label: 'Router', sub: 'model routing' },
+	{ net: 'A1', label: 'Runtime', sub: 'agent harness', star: true },
+	{ net: 'A2', label: 'Tools', sub: 'MCP · 600+ ops' },
+	{ net: 'A3', label: 'Eval gate', sub: 'release gate' },
+	{ net: 'OUT', label: 'Product', sub: '6 surfaces' },
 ];
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead title={`${SITE_TITLE} · Staff AI/ML Engineer`} description={SITE_DESCRIPTION} />
+		<BaseHead
+			title={`${SITE_TITLE} · ${AUTHOR.role}`}
+			description={SITE_DESCRIPTION}
+			ogImage="/og/home.png"
+		/>
 	</head>
 	<body>
 		<Header />
 		<main>
+			<!-- HERO -->
 			<section class="hero">
-				<p class="eyebrow">Staff AI/ML Engineer · 8+ years</p>
-				<h1>I build the system layer that makes AI products actually work.</h1>
+				<div class="status">
+					<span class="dot"></span>
+					<span class="net">{AUTHOR.role} · 8+ yrs · online</span>
+				</div>
+				<h1>
+					I build the <span class="hl">system layer</span> that makes AI products actually work.
+				</h1>
 				<p class="lede">
-					I'm Kaushal. I design and ship the unglamorous layer most AI demos skip — <strong
-						>agent runtimes, harnesses, evals, and developer platforms</strong
-					> — the infrastructure that makes AI reliable, safe, and easy to build on at scale.
+					I'm Kaushal. I design and ship the unglamorous layer most AI demos skip —
+					<strong>agent runtimes, harnesses, evals, and developer platforms</strong> — the infrastructure
+					that makes AI reliable, safe, and easy to build on at scale.
 				</p>
 				<div class="cta">
 					<a class="btn" href="/blog">Read the writing →</a>
 					<a class="btn ghost" href="/about">About me</a>
 				</div>
-				<p class="links">
-					<a href={AUTHOR.github}>GitHub</a> ·
-					<a href={AUTHOR.linkedin}>LinkedIn</a> ·
-					<a href={`mailto:${AUTHOR.email}`}>Email</a>
-				</p>
 			</section>
 
-			<section class="highlights">
+			<!-- SIGNATURE DIAGRAM -->
+			<figure class="diagram node">
+				<figcaption class="dcap net">
+					<span>FIG.01 — UNIFIED AI RUNTIME</span>
+					<span class="dcap-r">what I build</span>
+				</figcaption>
+				<div class="flow" role="img" aria-label="Data flow: prompt to router to agent runtime to tools/MCP to eval gate to product">
+					{
+						flow.map((n, i) => (
+							<>
+								<div class:list={['fnode', { star: n.star }]}>
+									<span class="fnet net">{n.net}</span>
+									<span class="flabel">{n.label}</span>
+									<span class="fsub">{n.sub}</span>
+								</div>
+								{i < flow.length - 1 && <span class="edge" aria-hidden="true">→</span>}
+							</>
+						))
+					}
+				</div>
+			</figure>
+
+			<!-- INSTRUMENT READOUTS -->
+			<section class="readouts" aria-label="Impact at scale">
 				{
-					highlights.map(([stat, label]) => (
-						<div class="stat">
-							<span class="num">{stat}</span>
-							<span class="label">{label}</span>
+					HIGHLIGHTS.map(([val, unit, desc]) => (
+						<div class="node readout">
+							<span class="rval">{val}</span>
+							<span class="runit net">{unit}</span>
+							<span class="rdesc">{desc}</span>
 						</div>
 					))
 				}
 			</section>
 
+			<!-- WHAT I WORK ON -->
 			<section class="what">
-				<h2>What I work on</h2>
-				<p>
-					Currently at <strong>HighLevel</strong>, where I architected the unified AI runtime and
-					agent harness behind 6+ product surfaces (Voice AI, Conversation AI, Agent Studio, Ask AI,
-					Ads Copilot, Email Agent). Previously: compliance agents at <strong>Zania</strong> (evidence
-					retrieval F1@10 86% → 97%) and a unified Document AI extraction stack at <strong
-						>Intellect</strong
-					> (replaced 23+ models, cut OCR spend 70%). I care about the boundary where ML research
-					meets production systems — model routing, tool calling, long-context state, memory, eval
-					gates, and the reliability engineering that keeps it all up.
-				</p>
+				<SectionHead net="SEC::CONTEXT" />
+				<div class="node whatbox">
+					<h2>What I work on</h2>
+					<p>
+						Currently at <strong>HighLevel</strong>, where I architected the unified AI runtime and
+						agent harness behind 6+ product surfaces (Voice AI, Conversation AI, Agent Studio, Ask AI,
+						Ads Copilot, Email Agent). Previously: compliance agents at <strong>Zania</strong> (evidence
+						retrieval F1@10 86% → 97%) and a unified Document AI stack at <strong>Intellect</strong>{' '}
+						(replaced 23+ models, cut OCR spend 70%). I care about the boundary where ML research meets
+						production systems — model routing, tool calling, long-context state, memory, eval gates, and
+						the reliability engineering that keeps it all up.
+					</p>
+				</div>
 			</section>
 
-			<section class="writing">
-				<h2>Latest writing</h2>
-				{posts.length === 0 && <p>New posts landing soon.</p>}
-				<ul>
+			<!-- TOPIC MAP -->
+			<section class="topics">
+				<SectionHead net="SEC::MODULES" href="/blog" label="all writing" />
+				<div class="topic-grid">
 					{
-						posts.map((post) => (
-							<li>
-								<a href={`/blog/${post.id}/`}>
-									<span class="post-title">{post.data.title}</span>
-									<FormattedDate date={post.data.pubDate} />
-								</a>
-							</li>
+						TOPICS.map((t) => (
+							<a
+								class="node node--link topic"
+								href={t.slug === 'papers' ? '/research/' : `/tags/${t.slug}/`}
+							>
+								<span class="tnet net">{t.net}</span>
+								<span class="tlabel">{t.label}</span>
+								<span class="tblurb">{t.blurb}</span>
+							</a>
 						))
 					}
-				</ul>
-				<p><a href="/blog">All posts →</a></p>
+				</div>
+			</section>
+
+			<!-- LATEST WRITING -->
+			<section class="writing">
+				<SectionHead net="SEC::WRITING" href="/blog" label="all posts" />
+				{posts.length === 0 && <p>New posts landing soon.</p>}
+				<div class="rows">
+					{posts.map((post, i) => <PostCard post={post} index={i + 1} variant="row" />)}
+				</div>
+			</section>
+
+			<!-- PAPERS TEASER -->
+			<section class="papers-teaser">
+				<SectionHead net="SEC::RESEARCH" href="/research" label="all papers" />
+				<div class="node ptbox">
+					<div class="pt-left">
+						<span class="net">{PAPERS.length} PEER-REVIEWED PUBLICATIONS</span>
+						<p class="pt-line">
+							EMNLP 2024 · Elsevier Applied Soft Computing ×2 — on Document AI, de-identification, and
+							parameter-efficient fine-tuning.
+						</p>
+					</div>
+					<a class="btn ghost" href="/research">Read the papers →</a>
+				</div>
+			</section>
+
+			<!-- RECRUITER CTA -->
+			<section class="contact node">
+				<span class="net">SEC::CONTACT</span>
+				<h2>Hiring for Staff / Principal AI platform work?</h2>
+				<p>
+					I write here about building production AI systems. If that's your world too — or you're
+					building an AI platform team — let's talk.
+				</p>
+				<div class="cta">
+					<a class="btn" href={AUTHOR.linkedin}>LinkedIn →</a>
+					<a class="btn ghost" href={`mailto:${AUTHOR.email}`}>Email</a>
+					<a class="btn ghost" href={AUTHOR.github}>GitHub</a>
+				</div>
 			</section>
 		</main>
 		<Footer />
-		<style>
-			.eyebrow {
-				text-transform: uppercase;
-				letter-spacing: 0.08em;
-				font-size: 0.8em;
-				color: rgb(var(--gray));
-				margin-bottom: 0.5em;
-			}
-			.hero h1 {
-				font-size: 2.6em;
-				line-height: 1.1;
-				margin-bottom: 0.4em;
-			}
-			.lede {
-				font-size: 1.15em;
-				color: rgb(var(--gray-dark));
-			}
-			.cta {
-				display: flex;
-				gap: 0.75em;
-				flex-wrap: wrap;
-				margin: 1.5em 0 0.75em;
-			}
-			.btn {
-				display: inline-block;
-				padding: 0.55em 1.1em;
-				border-radius: 8px;
-				background: var(--accent);
-				color: #fff;
-				text-decoration: none;
-				font-weight: 700;
-			}
-			.btn.ghost {
-				background: transparent;
-				color: var(--accent);
-				border: 1px solid var(--accent);
-			}
-			.links {
-				color: rgb(var(--gray));
-				font-size: 0.95em;
-			}
-			.highlights {
-				display: grid;
-				grid-template-columns: repeat(2, 1fr);
-				gap: 1.25em;
-				margin: 2.5em 0;
-				padding: 1.5em;
-				background: #fff;
-				border-radius: 12px;
-				box-shadow: var(--box-shadow);
-			}
-			.stat {
-				display: flex;
-				flex-direction: column;
-			}
-			.stat .num {
-				font-size: 1.8em;
-				font-weight: 700;
-				color: var(--accent);
-				line-height: 1;
-			}
-			.stat .label {
-				font-size: 0.85em;
-				color: rgb(var(--gray-dark));
-				margin-top: 0.35em;
-			}
-			.writing ul {
-				list-style: none;
-				padding: 0;
-			}
-			.writing li {
-				border-bottom: 1px solid rgb(var(--gray-light));
-			}
-			.writing li a {
-				display: flex;
-				justify-content: space-between;
-				align-items: baseline;
-				gap: 1em;
-				padding: 0.7em 0;
-				text-decoration: none;
-				color: rgb(var(--gray-dark));
-			}
-			.writing li a:hover .post-title {
-				color: var(--accent);
-			}
-			.writing .post-title {
-				font-weight: 700;
-			}
-			.writing time {
-				color: rgb(var(--gray));
-				font-size: 0.85em;
-				white-space: nowrap;
-			}
-			section {
-				margin-bottom: 2.5em;
-			}
-			@media (max-width: 720px) {
-				.hero h1 {
-					font-size: 2em;
-				}
-				.highlights {
-					grid-template-columns: 1fr;
-				}
-			}
-		</style>
 	</body>
 </html>
+
+<style>
+	main {
+		padding-top: 2.75rem;
+	}
+	section {
+		margin-bottom: 4rem;
+	}
+
+	/* HERO */
+	.hero {
+		max-width: 46rem;
+		margin-bottom: 2.75rem;
+	}
+	.status {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 1.1rem;
+	}
+	.hero h1 {
+		margin-bottom: 0.6rem;
+	}
+	.hl {
+		color: var(--accent);
+		position: relative;
+		white-space: nowrap;
+	}
+	.lede {
+		font-size: 1.16rem;
+		line-height: 1.65;
+		color: var(--ink-soft);
+		max-width: 40rem;
+	}
+	.cta {
+		display: flex;
+		gap: 0.7rem;
+		flex-wrap: wrap;
+		margin-top: 1.6rem;
+	}
+
+	/* DIAGRAM */
+	.diagram {
+		padding: 0;
+		overflow: hidden;
+		margin-bottom: 3.5rem;
+	}
+	.dcap {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.7rem 1.1rem;
+		border-bottom: var(--edge) solid var(--line);
+		background: var(--bg-inset);
+		color: var(--muted);
+	}
+	.dcap-r {
+		color: var(--accent);
+	}
+	.flow {
+		display: flex;
+		align-items: stretch;
+		gap: 0;
+		padding: 1.75rem 1.25rem;
+		overflow-x: auto;
+	}
+	.fnode {
+		flex: 1 1 0;
+		min-width: 96px;
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		padding: 0.9rem 0.75rem;
+		border: var(--edge) solid var(--line);
+		border-radius: var(--radius);
+		background: var(--bg-panel);
+		text-align: left;
+	}
+	.fnode.star {
+		border-color: var(--accent);
+		background: var(--accent-soft);
+		box-shadow: 0 0 0 1px var(--accent);
+	}
+	.fnet {
+		color: var(--muted);
+		font-size: 0.62rem;
+	}
+	.fnode.star .fnet {
+		color: var(--accent);
+	}
+	.flabel {
+		font-family: var(--font-display);
+		font-weight: 600;
+		font-size: 1rem;
+		color: var(--ink);
+	}
+	.fsub {
+		font-size: 0.74rem;
+		color: var(--muted);
+	}
+	.edge {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex: none;
+		width: 2rem;
+		color: var(--line-strong);
+		font-family: var(--font-mono);
+		font-size: 1.1rem;
+	}
+
+	/* READOUTS */
+	.readouts {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 1rem;
+	}
+	.readout {
+		padding: 1.2rem 1.2rem 1.25rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+	.rval {
+		font-family: var(--font-display);
+		font-weight: 700;
+		font-size: 1.9rem;
+		line-height: 1;
+		color: var(--accent);
+		letter-spacing: -0.02em;
+	}
+	.runit {
+		color: var(--muted);
+		margin-bottom: 0.55rem;
+	}
+	.rdesc {
+		font-size: 0.83rem;
+		line-height: 1.5;
+		color: var(--ink-soft);
+	}
+
+	/* WHAT */
+	.whatbox {
+		padding: 1.5rem 1.6rem;
+	}
+	.whatbox h2 {
+		margin-bottom: 0.6rem;
+	}
+	.whatbox p {
+		margin: 0;
+		color: var(--ink-soft);
+		max-width: 52rem;
+	}
+
+	/* TOPICS */
+	.topic-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 1rem;
+	}
+	.topic {
+		padding: 1.2rem 1.3rem 1.3rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+	.tnet {
+		color: var(--accent);
+		font-size: 0.64rem;
+	}
+	.tlabel {
+		font-family: var(--font-display);
+		font-weight: 600;
+		font-size: 1.08rem;
+		color: var(--ink);
+	}
+	.node--link:hover .tlabel {
+		color: var(--accent);
+	}
+	.tblurb {
+		font-size: 0.87rem;
+		line-height: 1.55;
+		color: var(--muted);
+	}
+
+	/* WRITING */
+	.rows {
+		display: flex;
+		flex-direction: column;
+		gap: 0.7rem;
+	}
+
+	/* PAPERS TEASER */
+	.ptbox {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1.5rem;
+		padding: 1.4rem 1.6rem;
+	}
+	.pt-left .net {
+		color: var(--accent);
+	}
+	.pt-line {
+		margin: 0.5rem 0 0;
+		color: var(--ink-soft);
+		font-size: 0.95rem;
+		max-width: 42rem;
+	}
+	.ptbox .btn {
+		flex: none;
+	}
+
+	/* CONTACT */
+	.contact {
+		padding: 2.25rem 2rem;
+		text-align: left;
+	}
+	.contact .net {
+		color: var(--muted);
+	}
+	.contact h2 {
+		margin: 0.6rem 0 0.5rem;
+	}
+	.contact p {
+		color: var(--ink-soft);
+		max-width: 40rem;
+		margin-bottom: 0;
+	}
+
+	@media (max-width: 860px) {
+		.topic-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+		.readouts {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+	@media (max-width: 640px) {
+		.topic-grid {
+			grid-template-columns: 1fr;
+		}
+		.ptbox {
+			flex-direction: column;
+			align-items: flex-start;
+		}
+		.flow {
+			padding: 1.25rem 1rem;
+		}
+	}
+</style>

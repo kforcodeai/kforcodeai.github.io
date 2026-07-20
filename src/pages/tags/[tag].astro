@@ -1,0 +1,79 @@
+---
+import { getCollection } from 'astro:content';
+import BaseHead from '../../components/BaseHead.astro';
+import Footer from '../../components/Footer.astro';
+import Header from '../../components/Header.astro';
+import PostCard from '../../components/PostCard.astro';
+import SectionHead from '../../components/SectionHead.astro';
+import { SITE_TITLE, TOPICS } from '../../consts';
+import { byDateDesc, tagCounts } from '../../lib/utils';
+
+export async function getStaticPaths() {
+	const posts = await getCollection('blog');
+	const tags = tagCounts(posts).map((t) => t.tag);
+	return tags.map((tag) => ({
+		params: { tag },
+		props: {
+			posts: posts.filter((p) => (p.data.tags ?? []).includes(tag)).sort(byDateDesc),
+		},
+	}));
+}
+
+const { tag } = Astro.params;
+const { posts } = Astro.props;
+const topic = TOPICS.find((t) => t.slug === tag);
+const label = topic?.label ?? `#${tag}`;
+const blurb =
+	topic?.blurb ?? `Posts tagged “${tag}” — production AI engineering notes by Kaushal Prajapati.`;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead
+			title={`${label} · ${SITE_TITLE}`}
+			description={`${blurb} ${posts.length} post${posts.length === 1 ? '' : 's'}.`}
+		/>
+	</head>
+	<body>
+		<Header />
+		<main>
+			<header class="page-head">
+				<span class="net">{topic?.net ?? `TAG::${tag.toUpperCase()}`} · {posts.length} POSTS</span>
+				<h1>{label}</h1>
+				<p class="page-intro">{blurb}</p>
+			</header>
+
+			<SectionHead net={`FILTER::#${tag}`} href="/blog" label="all writing" />
+			<section class="grid-cards posts">
+				{posts.map((post, i) => <PostCard post={post} index={i + 1} variant="card" />)}
+			</section>
+		</main>
+		<Footer />
+
+		<style>
+			.page-head {
+				margin-bottom: 2rem;
+			}
+			.page-head .net {
+				color: var(--accent);
+			}
+			.page-head h1 {
+				margin: 0.5rem 0 0.5rem;
+			}
+			.page-intro {
+				color: var(--muted);
+				max-width: 40rem;
+				margin: 0;
+			}
+			.posts {
+				grid-template-columns: repeat(2, 1fr);
+			}
+			@media (max-width: 640px) {
+				.posts {
+					grid-template-columns: 1fr;
+				}
+			}
+		</style>
+	</body>
+</html>

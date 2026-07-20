@@ -9,27 +9,29 @@ export default defineConfig({
 	site: 'https://kforcode.dev',
 	integrations: [mdx(), sitemap()],
 	fonts: [
+		// Display / headings — geometric, technical, distinctive.
 		{
-			provider: fontProviders.local(),
-			name: 'Atkinson',
-			cssVariable: '--font-atkinson',
-			fallbacks: ['sans-serif'],
-			options: {
-				variants: [
-					{
-						src: ['./src/assets/fonts/atkinson-regular.woff'],
-						weight: 400,
-						style: 'normal',
-						display: 'swap',
-					},
-					{
-						src: ['./src/assets/fonts/atkinson-bold.woff'],
-						weight: 700,
-						style: 'normal',
-						display: 'swap',
-					},
-				],
-			},
+			provider: fontProviders.google(),
+			name: 'Space Grotesk',
+			cssVariable: '--font-display',
+			weights: [500, 600, 700],
+			fallbacks: ['ui-sans-serif', 'system-ui', 'sans-serif'],
+		},
+		// Body / UI — neutral, high-legibility, recruiter-safe.
+		{
+			provider: fontProviders.google(),
+			name: 'Inter',
+			cssVariable: '--font-body',
+			weights: [400, 500, 600, 700],
+			fallbacks: ['ui-sans-serif', 'system-ui', 'sans-serif'],
+		},
+		// Mono — schematic labels, metadata, net-names, code.
+		{
+			provider: fontProviders.google(),
+			name: 'JetBrains Mono',
+			cssVariable: '--font-mono',
+			weights: [400, 500, 700],
+			fallbacks: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
 		},
 	],
 });

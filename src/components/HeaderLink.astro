@@ -6,19 +6,49 @@ type Props = HTMLAttributes<'a'>;
 const { href, class: className, ...props } = Astro.props;
 const pathname = Astro.url.pathname.replace(import.meta.env.BASE_URL, '');
 const subpath = pathname.match(/[^\/]+/g);
-const isActive = href === pathname || href === '/' + (subpath?.[0] || '');
+const base = '/' + (subpath?.[0] || '');
+const isActive = href === pathname || href === base || (href === '/research' && base === '/research');
 ---
 
-<a href={href} class:list={[className, { active: isActive }]} {...props}>
+<a href={href} class:list={[className, 'hlink', { active: isActive }]} {...props}>
 	<slot />
 </a>
 <style>
-	a {
-		display: inline-block;
+	.hlink {
+		position: relative;
+		font-family: var(--font-mono);
+		font-size: 0.82rem;
+		font-weight: 500;
+		letter-spacing: 0.01em;
+		padding: 0.4em 0.7em;
+		color: var(--muted);
 		text-decoration: none;
+		border-radius: var(--radius);
+		transition: color 0.15s var(--ease), background 0.15s var(--ease);
 	}
-	a.active {
-		font-weight: bolder;
-		text-decoration: underline;
+	.hlink:hover {
+		color: var(--ink);
+		background: var(--bg-inset);
+	}
+	.hlink.active {
+		color: var(--accent);
+	}
+	.hlink.active::before {
+		content: '';
+		position: absolute;
+		left: 0.7em;
+		right: 0.7em;
+		bottom: -0.55em;
+		height: 2px;
+		background: var(--accent);
+		border-radius: 2px;
+	}
+	@media (max-width: 640px) {
+		.hlink {
+			padding: 0.35em 0.4em;
+		}
+		.hlink.active::before {
+			bottom: -0.3em;
+		}
 	}
 </style>

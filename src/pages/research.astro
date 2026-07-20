@@ -1,0 +1,203 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import { AUTHOR, PAPERS, SITE_TITLE } from '../consts';
+
+const description =
+	'Peer-reviewed publications by Kaushal Prajapati — EMNLP 2024 and Elsevier Applied Soft Computing — on Document AI, de-identification, and parameter-efficient fine-tuning (LoRA / DoRA / PEFT).';
+
+// ScholarlyArticle structured data for each paper (AEO / rich results).
+const papersLd = PAPERS.map((p) => ({
+	'@context': 'https://schema.org',
+	'@type': 'ScholarlyArticle',
+	headline: p.title,
+	name: p.title,
+	abstract: p.abstract,
+	datePublished: String(p.year),
+	url: p.url,
+	author: { '@type': 'Person', name: AUTHOR.name, url: AUTHOR.site },
+	publisher: { '@type': 'Organization', name: p.venue },
+	isPartOf: { '@type': 'Periodical', name: p.venue },
+}));
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead
+			title={`Papers & Research · ${SITE_TITLE}`}
+			description={description}
+			ogImage="/og/research.png"
+		/>
+		{papersLd.map((ld) => <script type="application/ld+json" set:html={JSON.stringify(ld)} />)}
+	</head>
+	<body>
+		<Header />
+		<main>
+			<header class="page-head">
+				<span class="net">INDEX::RESEARCH · {PAPERS.length} PUBLICATIONS</span>
+				<h1>Papers &amp; Research</h1>
+				<p class="page-intro">
+					Peer-reviewed work at the intersection of deep learning and applied Document AI —
+					de-identification, clinical summarization, and parameter-efficient fine-tuning.
+				</p>
+			</header>
+
+			<ol class="papers">
+				{
+					PAPERS.map((p, i) => (
+						<li class="node paper">
+							<div class="p-rail">
+								<span class="p-id net">P{String(i + 1).padStart(2, '0')}</span>
+								<span class="p-year net">{p.year}</span>
+							</div>
+							<div class="p-body">
+								<span class="p-venue net">{p.venue}</span>
+								<h2 class="p-title">{p.title}</h2>
+								<p class="p-authors">{p.authors}</p>
+								<p class="p-abstract">{p.abstract}</p>
+								<div class="p-foot">
+									<div class="p-tags">
+										{p.tags.map((t) => (
+											<span class="chip">{t}</span>
+										))}
+									</div>
+									<a class="p-link" href={p.url} target="_blank" rel="noopener">
+										Read paper ↗
+									</a>
+								</div>
+							</div>
+						</li>
+					))
+				}
+			</ol>
+
+			<section class="node r-cta">
+				<span class="net">SEC::CITE</span>
+				<h2>Working on similar problems?</h2>
+				<p>
+					I'm always happy to talk retrieval, evals, PEFT, or Document AI. Full profile and code on{' '}
+					<a href={AUTHOR.linkedin}>LinkedIn</a> and <a href={AUTHOR.github}>GitHub</a>.
+				</p>
+			</section>
+		</main>
+		<Footer />
+
+		<style>
+			.page-head {
+				margin-bottom: 2rem;
+			}
+			.page-head .net {
+				color: var(--accent);
+			}
+			.page-head h1 {
+				margin: 0.5rem 0 0.5rem;
+			}
+			.page-intro {
+				color: var(--muted);
+				max-width: 42rem;
+				margin: 0;
+			}
+			.papers {
+				list-style: none;
+				margin: 0;
+				padding: 0;
+				display: flex;
+				flex-direction: column;
+				gap: 1.1rem;
+			}
+			.paper {
+				display: flex;
+				gap: 1.25rem;
+				padding: 1.5rem 1.6rem;
+			}
+			.p-rail {
+				display: flex;
+				flex-direction: column;
+				gap: 0.35rem;
+				flex: none;
+				width: 3rem;
+				padding-top: 0.15rem;
+			}
+			.p-id {
+				color: var(--accent);
+			}
+			.p-year {
+				color: var(--muted);
+			}
+			.p-body {
+				min-width: 0;
+			}
+			.p-venue {
+				color: var(--live);
+			}
+			.p-title {
+				font-size: 1.28rem;
+				line-height: 1.25;
+				margin: 0.4rem 0 0.35rem;
+			}
+			.p-authors {
+				font-size: 0.85rem;
+				color: var(--muted);
+				margin: 0 0 0.7rem;
+				font-family: var(--font-mono);
+			}
+			.p-abstract {
+				color: var(--ink-soft);
+				font-size: 0.96rem;
+				line-height: 1.65;
+				margin: 0 0 1.1rem;
+				max-width: 46rem;
+			}
+			.p-foot {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				gap: 1rem;
+				flex-wrap: wrap;
+			}
+			.p-tags {
+				display: flex;
+				gap: 0.4rem;
+				flex-wrap: wrap;
+			}
+			.p-link {
+				font-family: var(--font-mono);
+				font-size: 0.82rem;
+				font-weight: 500;
+				text-decoration: none;
+				white-space: nowrap;
+			}
+			.p-link:hover {
+				text-decoration: underline;
+			}
+			.r-cta {
+				margin-top: 2.5rem;
+				padding: 2rem;
+			}
+			.r-cta .net {
+				color: var(--muted);
+			}
+			.r-cta h2 {
+				margin: 0.6rem 0 0.5rem;
+			}
+			.r-cta p {
+				color: var(--ink-soft);
+				margin: 0;
+				max-width: 40rem;
+			}
+			@media (max-width: 640px) {
+				.paper {
+					flex-direction: column;
+					gap: 0.6rem;
+				}
+				.p-rail {
+					flex-direction: row;
+					gap: 0.75rem;
+					width: auto;
+				}
+			}
+		</style>
+	</body>
+</html>

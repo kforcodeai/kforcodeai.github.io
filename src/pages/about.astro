@@ -1,82 +1,256 @@
 ---
-import AboutHeroImage from '../assets/blog-placeholder-about.jpg';
-import Layout from '../layouts/BlogPost.astro';
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import SectionHead from '../components/SectionHead.astro';
+import { AUTHOR, PAPERS, SITE_TITLE } from '../consts';
+
+const description =
+	'Kaushal Prajapati — Staff AI/ML Engineer building agent runtimes, harnesses, evals, and MCP developer platforms. 8+ years shipping production AI, with publications at EMNLP 2024 and Elsevier ASOC.';
+
+const timeline = [
+	{
+		org: 'HighLevel',
+		role: 'Staff AI/ML Engineer · platform direction',
+		net: 'T0 · NOW',
+		body: 'Architected the unified AI runtime and agent harness — the shared execution layer behind Voice AI, Conversation AI, Agent Studio, Ask AI, Ads Copilot, and the Email Agent. 15M+ conversations and 800B+ tokens per quarter across 250K+ locations at 99.9% success. Also built the headless developer platform — MCP server, agent SDK, CLI, and plugin system exposing 600+ operations.',
+	},
+	{
+		org: 'Zania AI',
+		role: 'Applied AI Engineer · compliance agents',
+		net: 'T1',
+		body: 'Auto Compliance Agents for SOC 2, NIST, HIPAA, and third-party risk. Pushed evidence-retrieval F1@10 from 86% to 97% with hybrid retrieval, reranking, and citation-span ranking; built post-training and eval release gates.',
+	},
+	{
+		org: 'Intellect AI',
+		role: 'Lead ML Engineer · Document AI',
+		net: 'T2',
+		body: 'Led commercialization of an Underwriting Copilot (multi-agent Document AI). Replaced 23+ document-specific models with one layout-aware extraction architecture, and cut AWS Textract spend 70% across 6M+ PDFs.',
+	},
+	{
+		org: 'First American (Eagle Labs)',
+		role: 'R&D Engineer',
+		net: 'T3',
+		body: 'Parcel-level risk models that cut title-insurance claims 17%, and Plymouth — a document-classification framework for 2M+ docs across 1,400+ classes.',
+	},
+];
+
+const toolbox = [
+	'Python', 'TypeScript', 'PyTorch', 'Hugging Face', 'FastAPI', 'Node.js', 'vLLM',
+	'LoRA/QLoRA/PEFT', 'MCP', 'RAG', 'evals', 'AWS', 'GCP', 'Azure', 'Docker',
+	'Kubernetes', 'Postgres', 'Redis', 'OpenSearch',
+];
 ---
 
-<Layout
-	title="About"
-	description="Kaushal Prajapati — Staff AI/ML Engineer building agent runtimes, harnesses, evals, and MCP developer platforms. 8+ years shipping production AI, with publications at EMNLP 2024 and Elsevier ASOC."
-	pubDate={new Date('2026-07-19')}
-	heroImage={AboutHeroImage}
->
-	<p>
-		I'm <strong>Kaushal Kumar Prajapati</strong>, a Staff AI/ML Engineer with 8+ years turning
-		research-grade models into production platforms that serve millions of people. I work on the
-		system layer behind AI products — the <strong
-			>runtime, agent harness, evals, and developer surface</strong
-		> that most demos skip but every real product depends on.
-	</p>
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`About · ${SITE_TITLE}`} description={description} ogImage="/og/about.png" />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<header class="page-head">
+				<span class="net">PROFILE::{AUTHOR.handle.toUpperCase()}</span>
+				<h1>About</h1>
+				<p class="lede">
+					I'm <strong>Kaushal Kumar Prajapati</strong>, a Staff AI/ML Engineer with 8+ years turning
+					research-grade models into production platforms that serve millions. I work on the{' '}
+					<strong>system layer</strong> behind AI products — the runtime, agent harness, evals, and
+					developer surface that most demos skip but every real product depends on.
+				</p>
+			</header>
 
-	<h2>What I'm doing now</h2>
-	<p>
-		At <strong>HighLevel</strong>, I set platform direction and architected the unified AI runtime and
-		agent harness — the shared execution layer behind Voice AI, Conversation AI, Agent Studio, Ask AI,
-		Ads Copilot, and the Email Agent. It runs <strong>15M+ conversations and 800B+ tokens per
-		quarter</strong> across 250K+ active locations at 99.9% success. I also built HighLevel's headless
-		developer platform — an MCP server, agent SDK, CLI, and plugin system exposing
-		<strong>600+ operations</strong> so anyone can automate via Claude, ChatGPT, Cursor, or any standard
-		agent, with no UI.
-	</p>
+			<section class="block">
+				<SectionHead net="SEC::TIMELINE" />
+				<ol class="timeline">
+					{
+						timeline.map((t) => (
+							<li class="tl-item">
+								<span class="tl-marker" aria-hidden="true" />
+								<div class="node tl-card">
+									<span class="tl-net net">{t.net}</span>
+									<h3 class="tl-org">{t.org}</h3>
+									<span class="tl-role net">{t.role}</span>
+									<p class="tl-body">{t.body}</p>
+								</div>
+							</li>
+						))
+					}
+				</ol>
+			</section>
 
-	<h2>Before this</h2>
-	<ul>
-		<li>
-			<strong>Zania AI</strong> — Applied AI Engineer on compliance agents (SOC 2, NIST, HIPAA,
-			TPRA). Pushed evidence-retrieval F1@10 from 86% to 97% with hybrid retrieval, reranking, and
-			citation-span ranking; built post-training and eval release gates.
-		</li>
-		<li>
-			<strong>Intellect AI</strong> — Lead ML Engineer. Led commercialization of an Underwriting
-			Copilot (multi-agent Document AI), replaced 23+ document-specific models with one layout-aware
-			extraction architecture, and cut AWS Textract spend 70% across 6M+ PDFs.
-		</li>
-		<li>
-			<strong>First American (Eagle Labs)</strong> — R&amp;D Engineer. Parcel-level risk models that
-			cut title-insurance claims 17%, and Plymouth, a document-classification framework for 2M+ docs
-			across 1,400+ classes.
-		</li>
-	</ul>
+			<section class="block">
+				<SectionHead net="SEC::RESEARCH" href="/research" label="all papers" />
+				<div class="node research-box">
+					<ul>
+						{
+							PAPERS.map((p) => (
+								<li>
+									<a href={p.url} target="_blank" rel="noopener">
+										{p.title}
+									</a>
+									<span class="net"> · {p.venue}</span>
+								</li>
+							))
+						}
+					</ul>
+				</div>
+			</section>
 
-	<h2>Research</h2>
-	<ul>
-		<li>
-			<strong>EMNLP 2024</strong> — De-Identification of Sensitive Personal Data in
-			IIT-CDIP-Derived Datasets.
-			<a href="https://aclanthology.org/2024.emnlp-main.1198/">aclanthology.org</a>
-		</li>
-		<li>
-			<strong>Elsevier ASOC</strong> — Parameter-Efficient Fine-Tuning for Hospital Discharge
-			Summarization.
-			<a href="https://www.sciencedirect.com/science/article/pii/S1568494624003053">sciencedirect.com</a>
-		</li>
-		<li>
-			<strong>Elsevier ASOC</strong> — DoRA+: Enhancing Weight-Decomposed Low-Rank Adaptation.
-			<a href="https://www.sciencedirect.com/science/article/pii/S1568494626013098">sciencedirect.com</a>
-		</li>
-	</ul>
+			<section class="block">
+				<SectionHead net="SEC::TOOLBOX" />
+				<div class="toolbox">
+					{toolbox.map((tool) => <span class="chip chip--plain">{tool}</span>)}
+				</div>
+			</section>
 
-	<h2>Toolbox</h2>
-	<p>
-		Python · TypeScript · PyTorch · Hugging Face · FastAPI · Node.js · vLLM · LoRA/QLoRA/PEFT ·
-		MCP · RAG · evals · AWS/GCP/Azure · Docker · Kubernetes · Postgres · Redis · OpenSearch.
-	</p>
+			<section class="node contact">
+				<span class="net">SEC::CONTACT</span>
+				<h2>Get in touch</h2>
+				<p>
+					I write here about building production AI systems. If that's your world too — or you're
+					hiring for Staff/Principal AI platform work — reach out.
+				</p>
+				<div class="cta">
+					<a class="btn" href={AUTHOR.linkedin}>LinkedIn →</a>
+					<a class="btn ghost" href={`mailto:${AUTHOR.email}`}>Email</a>
+					<a class="btn ghost" href={AUTHOR.github}>GitHub</a>
+				</div>
+			</section>
+		</main>
+		<Footer />
 
-	<h2>Get in touch</h2>
-	<p>
-		I write here about building production AI systems. If that's your world too — or you're hiring
-		for Staff/Principal AI platform work — reach me on
-		<a href="https://www.linkedin.com/in/kforcode/">LinkedIn</a>, over
-		<a href="mailto:kaushalcse07@gmail.com">email</a>, or find my code on
-		<a href="https://github.com/kforcodeai">GitHub</a>.
-	</p>
-</Layout>
+		<style>
+			.page-head {
+				max-width: 46rem;
+				margin-bottom: 3rem;
+			}
+			.page-head .net {
+				color: var(--accent);
+			}
+			.page-head h1 {
+				margin: 0.5rem 0 0.75rem;
+			}
+			.lede {
+				font-size: 1.14rem;
+				line-height: 1.6;
+				color: var(--ink-soft);
+				margin: 0;
+			}
+			.block {
+				margin-bottom: 3.25rem;
+			}
+
+			/* Timeline — schematic bus with node markers */
+			.timeline {
+				list-style: none;
+				margin: 0;
+				padding: 0;
+			}
+			.tl-item {
+				position: relative;
+				padding-left: 2rem;
+				padding-bottom: 1.1rem;
+			}
+			.tl-item::before {
+				/* the bus line */
+				content: '';
+				position: absolute;
+				left: 5px;
+				top: 6px;
+				bottom: -6px;
+				width: 1px;
+				background: var(--line-strong);
+			}
+			.tl-item:last-child::before {
+				display: none;
+			}
+			.tl-marker {
+				position: absolute;
+				left: 0;
+				top: 6px;
+				width: 11px;
+				height: 11px;
+				border-radius: 50%;
+				background: var(--bg);
+				border: 2px solid var(--accent);
+			}
+			.tl-item:first-child .tl-marker {
+				background: var(--accent);
+				box-shadow: 0 0 0 4px var(--accent-soft);
+			}
+			.tl-card {
+				padding: 1.2rem 1.4rem;
+			}
+			.tl-net {
+				color: var(--accent);
+			}
+			.tl-org {
+				margin: 0.35rem 0 0.15rem;
+				font-size: 1.2rem;
+			}
+			.tl-role {
+				color: var(--muted);
+				text-transform: none;
+				letter-spacing: 0.02em;
+			}
+			.tl-body {
+				margin: 0.7rem 0 0;
+				color: var(--ink-soft);
+				font-size: 0.96rem;
+				line-height: 1.65;
+			}
+
+			.research-box ul {
+				list-style: none;
+				margin: 0;
+				padding: 0.4rem 0.6rem;
+			}
+			.research-box li {
+				padding: 0.55rem 0;
+				border-bottom: var(--edge) solid var(--line);
+				font-size: 0.98rem;
+			}
+			.research-box li:last-child {
+				border-bottom: none;
+			}
+			.research-box a {
+				text-decoration: none;
+				font-weight: 500;
+			}
+			.research-box a:hover {
+				text-decoration: underline;
+			}
+			.research-box .net {
+				color: var(--muted);
+			}
+
+			.toolbox {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+			}
+
+			.contact {
+				padding: 2.25rem 2rem;
+			}
+			.contact .net {
+				color: var(--muted);
+			}
+			.contact h2 {
+				margin: 0.6rem 0 0.5rem;
+			}
+			.contact p {
+				color: var(--ink-soft);
+				max-width: 40rem;
+			}
+			.cta {
+				display: flex;
+				gap: 0.7rem;
+				flex-wrap: wrap;
+				margin-top: 1.3rem;
+			}
+		</style>
+	</body>
+</html>

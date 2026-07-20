@@ -1,0 +1,25 @@
+---
+interface Props {
+	net: string; // net-label, e.g. "SEC::WRITING"
+	href?: string; // optional "view all" link
+	label?: string; // optional link text
+}
+const { net, href, label } = Astro.props;
+---
+
+<div class="section-head">
+	<span class="net">{net}</span>
+	<span class="rule"></span>
+	{href && <a class="net see-all" href={href}>{label ?? 'view all'} →</a>}
+</div>
+
+<style>
+	.see-all {
+		text-decoration: none;
+		color: var(--muted);
+		transition: color 0.15s var(--ease);
+	}
+	.see-all:hover {
+		color: var(--accent);
+	}
+</style>

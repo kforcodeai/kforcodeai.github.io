@@ -4,7 +4,7 @@
 import '../styles/global.css';
 import type { ImageMetadata } from 'astro';
 import FallbackImage from '../assets/blog-placeholder-1.jpg';
-import { AUTHOR, SITE_DESCRIPTION, SITE_KEYWORDS, SITE_TITLE } from '../consts';
+import { AUTHOR, PAPERS, SITE_DESCRIPTION, SITE_KEYWORDS, SITE_TITLE } from '../consts';
 import { Font } from 'astro:assets';
 
 interface Props {
@@ -62,12 +62,19 @@ const personLd = {
 	'@context': 'https://schema.org',
 	'@type': 'Person',
 	name: AUTHOR.name,
-	alternateName: 'kforcode',
+	alternateName: AUTHOR.handle,
 	url: AUTHOR.site,
 	jobTitle: AUTHOR.role,
 	email: `mailto:${AUTHOR.email}`,
-	sameAs: [AUTHOR.github, AUTHOR.linkedin].filter(Boolean),
+	worksFor: { '@type': 'Organization', name: 'HighLevel' },
+	sameAs: [AUTHOR.github, AUTHOR.linkedin, ...PAPERS.map((p) => p.url)].filter(Boolean),
 	knowsAbout: SITE_KEYWORDS,
+	subjectOf: PAPERS.map((p) => ({
+		'@type': 'ScholarlyArticle',
+		name: p.title,
+		url: p.url,
+		datePublished: String(p.year),
+	})),
 };
 
 const articleLd = pubDate && {
@@ -86,6 +93,19 @@ const articleLd = pubDate && {
 <!-- Global Metadata -->
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+<!-- Theme: apply stored override before paint to avoid a flash. Absent = follow OS. -->
+<script is:inline>
+	(function () {
+		try {
+			var t = localStorage.getItem('theme');
+			if (t === 'light' || t === 'dark')
+				document.documentElement.setAttribute('data-theme', t);
+		} catch (e) {}
+	})();
+</script>
+<meta name="theme-color" content="#080b11" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="icon" href="/favicon.ico" />
 <link rel="sitemap" href="/sitemap-index.xml" />
@@ -97,7 +117,9 @@ const articleLd = pubDate && {
 />
 <meta name="generator" content={Astro.generator} />
 
-<Font cssVariable="--font-atkinson" preload />
+<Font cssVariable="--font-body" preload />
+<Font cssVariable="--font-display" preload />
+<Font cssVariable="--font-mono" />
 
 <!-- Canonical URL -->
 <link rel="canonical" href={canonicalURL} />
