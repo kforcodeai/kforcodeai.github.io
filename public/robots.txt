@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://kforcodeai.github.io/sitemap-index.xml
+Sitemap: https://kforcode.dev/sitemap-index.xml

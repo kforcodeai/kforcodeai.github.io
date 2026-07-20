@@ -12,7 +12,7 @@ export const AUTHOR = {
 	github: 'https://github.com/kforcodeai',
 	linkedin: 'https://www.linkedin.com/in/kforcode/',
 	twitter: '', // add if/when you create one, e.g. https://x.com/kforcode
-	site: 'https://kforcodeai.github.io',
+	site: 'https://kforcode.dev',
 };
 
 // Comma-free keyword list used for meta keywords + structured data.

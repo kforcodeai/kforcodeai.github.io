@@ -6,7 +6,7 @@ import { defineConfig, fontProviders } from 'astro/config';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://kforcodeai.github.io',
+	site: 'https://kforcode.dev',
 	integrations: [mdx(), sitemap()],
 	fonts: [
 		{
