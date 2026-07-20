@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Terminal prompt">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Kforcode monogram">
   <rect width="128" height="128" rx="18" fill="#0b0b0b"/>
-  <path d="m31 35 29 29-29 29" fill="none" stroke="#4ade80" stroke-width="12" stroke-linecap="square" stroke-linejoin="miter"/>
-  <path d="M66 94h33" fill="none" stroke="#f1f1f1" stroke-width="12" stroke-linecap="square"/>
+  <path d="M31 25v78M34 65 76 25M34 64l43 39" fill="none" stroke="#f1f1f1" stroke-width="12" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M80 102h25" fill="none" stroke="#4ade80" stroke-width="10" stroke-linecap="square"/>
 </svg>
