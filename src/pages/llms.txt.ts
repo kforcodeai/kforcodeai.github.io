@@ -36,9 +36,16 @@ ${AUTHOR.name} (${AUTHOR.handle}) is a ${AUTHOR.role} who builds the system laye
 ## Writing
 ${postLines}
 
+## Experience timeline
+- HighLevel — Staff Software Engineer, AI Platform — Dallas, TX / Remote — Jul 2025 to Present.
+- Zania AI — Applied AI Engineer, Compliance Agents — San Francisco, CA / Remote — Nov 2024 to Jun 2025.
+- Intellect AI, Intellect Design Arena — Lead Machine Learning Engineer — Bengaluru, India / Remote — Sep 2021 to Nov 2024.
+- Eagle Labs, First American India — Research & Development Engineer — Bengaluru, India / Remote — Jul 2018 to Sep 2021.
+
 ## Selected Zania AI work
-- Enterprise compliance agents: Built autonomous agents and document Q&A systems for SOC 2, NIST, third-party risk assessments, and security questionnaire automation.
+- Enterprise compliance agents: Built autonomous agents and document Q&A systems for SOC 2, NIST, HIPAA, third-party risk assessments, and security questionnaire automation.
 - Evidence retrieval: Improved F1@10 from 86% to 97%, directly preventing churn of Zania's largest enterprise client.
+- Model quality: Built post-training and evaluation release gates with synthetic evidence, hard negatives, rejection sampling, and held-out audit QA; fine-tuned Qwen2.5-7B, Llama-3.1-8B, Phi-3 Mini, and Gemma-2-9B with LoRA/QLoRA, PEFT, and 4-bit quantization.
 - LLM orchestration: Designed asynchronous, high-concurrency job processing with Azure Service Bus, Redis, global rate limiting, and Azure API Management.
 - Cybersecurity documentation: Built a multi-agent system for Netflix that reduced delivery SLA from days to hours.
 

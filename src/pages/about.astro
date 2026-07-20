@@ -8,37 +8,39 @@ import { AUTHOR, PAPERS, SITE_KEYWORDS } from '../consts';
 const description = 'Kaushal Prajapati is a Staff AI/ML Engineer with 8+ years building enterprise agentic systems, RAG, LLM orchestration, Document AI, GraphRAG, OCR, and ML platforms.';
 
 const timeline = [
-	{ org: 'HighLevel', role: 'Staff AI/ML Engineer', time: 'now', body: 'Architected the unified AI runtime and agent harness behind six AI product surfaces. The platform carries 15M+ conversations and 800B+ tokens per quarter. Also built a headless developer platform with an MCP server, SDK, CLI, and plugin system exposing 600+ operations.', impact: '6+ products · 99.9% success' },
-	{ org: 'Zania AI', role: 'Applied AI Engineer', time: 'Nov 2024 – present', body: 'Built enterprise compliance and cybersecurity automation using autonomous agents, retrieval-augmented generation, document question answering, and scalable LLM job orchestration.', impact: 'enterprise compliance AI' },
-	{ org: 'Intellect AI · Intellect Design Arena', role: 'Senior Project Lead · Senior ML Engineer', time: 'Sep 2021 – Nov 2024', body: 'Progressed across two roles, taking Document AI, underwriting, graph intelligence, and information-extraction systems from model architecture through multi-client commercialization.', impact: '2 roles · product + platform' },
-	{ org: 'First American · Eagle Labs', role: 'R&D Engineer', time: 'earlier', body: 'Built production systems across document intake, understanding, verification, property risk, data security, and customer intelligence for the title and escrow lifecycle.', impact: '7 production systems' },
+	{ org: 'HighLevel', role: 'Staff Software Engineer, AI Platform', location: 'Dallas, TX · remote', time: 'Jul 2025 – Present', body: 'Architected the unified AI runtime and agent harness behind six AI product surfaces. The platform carries 15M+ conversations and 800B+ tokens per quarter. Also built a headless developer platform with an MCP server, SDK, CLI, and plugin system exposing 600+ operations.', impact: '6+ products · 99.9% success' },
+	{ org: 'Zania AI', role: 'Applied AI Engineer, Compliance Agents', location: 'San Francisco, CA · remote', time: 'Nov 2024 – Jun 2025', body: 'Built enterprise compliance and cybersecurity automation using autonomous agents, retrieval-augmented generation, document question answering, and scalable LLM job orchestration.', impact: 'enterprise compliance AI' },
+	{ org: 'Intellect AI · Intellect Design Arena', role: 'Lead Machine Learning Engineer', location: 'Bengaluru, India · remote', time: 'Sep 2021 – Nov 2024', body: 'Took Document AI, underwriting, graph intelligence, and information-extraction systems from model architecture through multi-client commercialization.', impact: 'product + platform' },
+	{ org: 'Eagle Labs · First American India', role: 'Research & Development Engineer', location: 'Bengaluru, India · remote', time: 'Jul 2018 – Sep 2021', body: 'Built production systems across document intake, understanding, verification, property risk, data security, and customer intelligence for the title and escrow lifecycle.', impact: '7 production systems' },
 ];
 
 const selectedRoles = [
 	{
 		code: 'ZA',
 		org: 'Zania AI',
-		role: 'Applied AI Engineer',
-		location: 'San Francisco · remote',
-		period: 'Nov 2024 – present',
+		role: 'Applied AI Engineer, Compliance Agents',
+		location: 'San Francisco, CA · remote',
+		period: 'Nov 2024 – Jun 2025',
 		description: 'Enterprise compliance and cybersecurity automation built on autonomous agents, RAG, and document question answering.',
 		impact: ['86% → 97% F1@10', 'days → hours', 'largest-client retention'],
 		bullets: [
-			'Built autonomous agents and intelligent bots that automated SOC 2 and NIST workflows, third-party risk assessments (TPRA), and security questionnaires using LLMs, RAG, and document question answering.',
+			'Built autonomous agents and intelligent bots that automated SOC 2, NIST, HIPAA, third-party risk assessment (TPRA), and security-questionnaire workflows using LLMs, RAG, and document question answering.',
 			'Raised evidence-retrieval F1@10 from 86% to 97%; the improvement directly prevented churn of Zania\'s largest enterprise client.',
+			'Built post-training and evaluation release gates with synthetic control-evidence pairs, hard negatives, rejection sampling, and held-out audit QA to measure faithfulness, citation accuracy, hallucination rate, and control coverage.',
+			'Fine-tuned Qwen2.5-7B, Llama-3.1-8B, Phi-3 Mini, and Gemma-2-9B using LoRA/QLoRA, PEFT, and 4-bit quantization, then deployed cost-aware routing between open small language models and frontier LLM APIs.',
 			'Designed and deployed asynchronous LLM job orchestration with Azure Service Bus and Redis, including global rate limiting for high-concurrency workloads.',
 			'Developed a cybersecurity-documentation multi-agent system for Netflix that reduced delivery SLA from days to hours.',
 		],
-		tools: ['OpenAI', 'Anthropic', 'LLMs', 'RAG', 'Azure Service Bus', 'Redis', 'Document Q&A', 'Python', 'SOC 2', 'Azure API Management', 'LangChain', 'LlamaIndex', 'Mem0'],
+		tools: ['OpenAI', 'Anthropic', 'LLMs', 'RAG', 'Azure Service Bus', 'Redis', 'Document Q&A', 'Python', 'SOC 2', 'NIST', 'HIPAA', 'TPRA', 'Azure API Management', 'Hugging Face', 'LoRA / QLoRA', 'PEFT', '4-bit quantization', 'LangChain', 'LlamaIndex', 'Mem0'],
 	},
 	{
 		code: 'IA',
 		org: 'Intellect AI · Intellect Design Arena',
-		role: 'Senior Project Lead',
-		location: 'Bengaluru, India',
-		period: 'Sep 2022 – Nov 2024',
-		description: 'Commercialized Underwriting CoPilot and built the ingestion, model, graph, and routing systems behind enterprise underwriting intelligence.',
-		impact: ['6M+ PDFs', '70% lower OCR cost', '73% → 79% F1'],
+		role: 'Lead Machine Learning Engineer',
+		location: 'Bengaluru, India · remote',
+		period: 'Sep 2021 – Nov 2024',
+		description: 'Commercialized Underwriting CoPilot and unified the ingestion, extraction, graph, routing, and human-in-the-loop systems behind enterprise document intelligence.',
+		impact: ['6M+ PDFs', '23+ → 1 model', '4× sales growth'],
 		bullets: [
 			'Commercialized Underwriting CoPilot, a multi-agent RAG system that gave underwriters contextual document understanding and dynamically generated risk summaries.',
 			'Engineered layout-aware chunking and document-ingestion microservices that processed more than 6 million PDFs while cutting AWS Textract costs by 70%.',
@@ -47,24 +49,12 @@ const selectedRoles = [
 			'Added natural-language-to-Cypher conversion so users could run analytical graph workflows without writing Cypher queries.',
 			'Implemented an intent-aware query router that selected Boolean, full-text, vector, or LLM pipelines, avoiding unnecessary high-capability model and vector-database calls.',
 			'Applied GraphRAG to title-chain and claims graphs to detect fraud patterns and suspicious relationships.',
-		],
-		tools: ['Multi-agent systems', 'Query routing', 'RAG', 'AWS Textract', '7B LLMs', 'Neo4j', 'Text-to-Cypher', 'Text-to-SQL', 'PyTorch', 'GraphRAG', 'AWS Lambda', 'AWS SQS', 'AWS S3', 'Docker', 'OpenAI', 'AWS Bedrock', 'Unsloth', 'Hugging Face', 'LangChain', 'LlamaIndex', 'LangGraph', 'LangFlow', 'LangSmith', 'YOLOv8', 'Table Transformer', 'Reading-order detection', 'Speech-to-Text'],
-	},
-	{
-		code: 'IA',
-		org: 'Intellect AI · Intellect Design Arena',
-		role: 'Senior Machine Learning Engineer',
-		location: 'Bengaluru, India',
-		period: 'Sep 2021 – Sep 2022',
-		description: 'Unified and productized a layout-aware intelligent document processing platform for enterprise clients.',
-		impact: ['23+ → 1 model', '4× sales growth', '60% shorter cycles'],
-		bullets: [
 			'Built a unified, layout-aware information-extraction model that replaced 23+ legacy ML pipelines, reducing deployment complexity and technical debt.',
 			'Productized the intelligent document processing service, enabling 4× sales growth and onboarding six new enterprise clients.',
 			'Developed a human-in-the-loop data-labeling system that reduced annotation and model-retraining cycles by 60%.',
 			'Created modular OCR pipelines with document-type-aware routing to the most suitable OCR backend.',
 		],
-		tools: ['Object detection', 'AWS SageMaker', 'Hugging Face', 'DeepSpeed', 'ONNX', 'Evidently', 'MLflow', 'Kubeflow', 'OCR', 'HITL systems', 'Document processing', 'Information extraction', 'Python', 'ML pipelines'],
+		tools: ['Multi-agent systems', 'Query routing', 'RAG', 'AWS Textract', '7B LLMs', 'Neo4j', 'Text-to-Cypher', 'Text-to-SQL', 'PyTorch', 'GraphRAG', 'AWS Lambda', 'AWS SQS', 'AWS S3', 'Docker', 'OpenAI', 'AWS Bedrock', 'Unsloth', 'Hugging Face', 'LangChain', 'LlamaIndex', 'LangGraph', 'LangFlow', 'LangSmith', 'YOLOv8', 'Table Transformer', 'Reading-order detection', 'Speech-to-Text', 'Object detection', 'AWS SageMaker', 'DeepSpeed', 'ONNX', 'Evidently', 'MLflow', 'Kubeflow', 'OCR', 'HITL systems', 'Document processing', 'Information extraction', 'Python', 'ML pipelines'],
 	},
 ];
 
@@ -178,7 +168,7 @@ const profileLd = {
 const projectsLd = {
 	'@context': 'https://schema.org',
 	'@type': 'ItemList',
-	name: 'Selected AI and machine learning projects at First American Eagle Labs',
+	name: 'Selected AI and machine learning projects at Eagle Labs, First American India',
 	description: 'Production Document AI, OCR, e-signing, risk modeling, data security, and customer intelligence systems built by Kaushal Prajapati.',
 	itemListElement: eagleProjects.map((project, index) => ({
 		'@type': 'ListItem',
@@ -255,7 +245,7 @@ const selectedWorkLd = {
 						<li>
 							<div class="item-meta net"><span>0{i + 1}</span><span>{item.time}</span></div>
 							<div class="item-body">
-								<div class="item-head"><div><h3>{item.org}</h3><span>{item.role}</span></div><strong>{item.impact}</strong></div>
+								<div class="item-head"><div><h3>{item.org}</h3><span>{item.role}</span><span class="item-location">{item.location}</span></div><strong>{item.impact}</strong></div>
 								<p>{item.body}</p>
 							</div>
 						</li>
@@ -299,7 +289,7 @@ const selectedWorkLd = {
 			</section>
 
 			<section class="projects" aria-labelledby="eagle-projects-title">
-				<SectionHead net="selected_work · First American / Eagle Labs" />
+				<SectionHead net="selected_work · Eagle Labs / First American India" />
 				<div class="projects-intro">
 					<div>
 						<h2 id="eagle-projects-title">Applied ML across the title lifecycle.</h2>
@@ -458,6 +448,10 @@ const selectedWorkLd = {
 		color: var(--muted);
 		font-family: var(--font-mono);
 		font-size: 0.64rem;
+	}
+
+	.item-location::before {
+		content: ' · ';
 	}
 
 	.item-head > strong {
