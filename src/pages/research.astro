@@ -5,199 +5,369 @@ import Header from '../components/Header.astro';
 import { AUTHOR, PAPERS, SITE_TITLE } from '../consts';
 
 const description =
-	'Peer-reviewed publications by Kaushal Prajapati — EMNLP 2024 and Elsevier Applied Soft Computing — on Document AI, de-identification, and parameter-efficient fine-tuning (LoRA / DoRA / PEFT).';
+	'Peer-reviewed AI research by Kaushal Prajapati on Document AI, privacy, clinical summarization, LoRA, DoRA, and parameter-efficient fine-tuning.';
 
-// ScholarlyArticle structured data for each paper (AEO / rich results).
-const papersLd = PAPERS.map((p) => ({
+const papersLd = PAPERS.map((paper) => ({
 	'@context': 'https://schema.org',
 	'@type': 'ScholarlyArticle',
-	headline: p.title,
-	name: p.title,
-	abstract: p.abstract,
-	datePublished: String(p.year),
-	url: p.url,
+	headline: paper.title,
+	name: paper.title,
+	abstract: paper.abstract,
+	datePublished: String(paper.year),
+	url: paper.url,
 	author: { '@type': 'Person', name: AUTHOR.name, url: AUTHOR.site },
-	publisher: { '@type': 'Organization', name: p.venue },
-	isPartOf: { '@type': 'Periodical', name: p.venue },
+	publisher: { '@type': 'Organization', name: paper.venue },
+	isPartOf: { '@type': 'Periodical', name: paper.venue },
 }));
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead
-			title={`Papers & Research · ${SITE_TITLE}`}
-			description={description}
-			ogImage="/og/research.png"
-		/>
+		<BaseHead title={`AI research and peer-reviewed papers · ${SITE_TITLE}`} description={description} ogImage="/og/research.png" />
 		{papersLd.map((ld) => <script type="application/ld+json" set:html={JSON.stringify(ld)} />)}
 	</head>
 	<body>
 		<Header />
 		<main>
 			<header class="page-head">
-				<span class="net">INDEX::RESEARCH · {PAPERS.length} PUBLICATIONS</span>
-				<h1>Papers &amp; Research</h1>
-				<p class="page-intro">
-					Peer-reviewed work at the intersection of deep learning and applied Document AI —
-					de-identification, clinical summarization, and parameter-efficient fine-tuning.
-				</p>
+				<div class="head-main">
+					<span class="eyebrow">Peer review · field work · implementation</span>
+					<h1>Research with a<br /><em>shipping bias.</em></h1>
+					<p>
+						My published work explores the same boundary as my engineering: how to make deep-learning
+						systems more useful, efficient, and responsible in the real world.
+					</p>
+				</div>
+				<aside class="research-stamp" aria-label="Research overview">
+					<span class="stamp-count">{String(PAPERS.length).padStart(2, '0')}</span>
+					<strong>peer-reviewed<br />publications</strong>
+					<div class="stamp-meta net">
+						<span>EMNLP · MAIN</span>
+						<span>ELSEVIER · ASOC ×2</span>
+						<span>2024—2025</span>
+					</div>
+				</aside>
 			</header>
 
-			<ol class="papers">
-				{
-					PAPERS.map((p, i) => (
-						<li class="node paper">
-							<div class="p-rail">
-								<span class="p-id net">P{String(i + 1).padStart(2, '0')}</span>
-								<span class="p-year net">{p.year}</span>
+			<section class="papers" aria-labelledby="papers-title">
+				<div class="section-title">
+					<span class="net">PUBLICATION INDEX / 01</span>
+					<h2 id="papers-title">The papers</h2>
+				</div>
+
+				<ol class="paper-list">
+					{PAPERS.map((paper, i) => (
+						<li class="paper">
+							<div class="paper-index">
+								<span class="paper-no">P{String(i + 1).padStart(2, '0')}</span>
+								<span class="net">{paper.year}</span>
 							</div>
-							<div class="p-body">
-								<span class="p-venue net">{p.venue}</span>
-								<h2 class="p-title">{p.title}</h2>
-								<p class="p-authors">{p.authors}</p>
-								<p class="p-abstract">{p.abstract}</p>
-								<div class="p-foot">
-									<div class="p-tags">
-										{p.tags.map((t) => (
-											<span class="chip">{t}</span>
-										))}
-									</div>
-									<a class="p-link" href={p.url} target="_blank" rel="noopener">
-										Read paper ↗
-									</a>
+							<div class="paper-body">
+								<span class="venue net">{paper.venue}</span>
+								<h3>{paper.title}</h3>
+								<p class="authors">{paper.authors}</p>
+								<p class="abstract">{paper.abstract}</p>
+								<div class="paper-foot">
+									<div>{paper.tags.map((tag) => <span class="chip">{tag}</span>)}</div>
+									<a href={paper.url} target="_blank" rel="noopener">Read the paper <span>↗</span></a>
 								</div>
 							</div>
 						</li>
-					))
-				}
-			</ol>
+					))}
+				</ol>
+			</section>
 
-			<section class="node r-cta">
-				<span class="net">SEC::CITE</span>
-				<h2>Working on similar problems?</h2>
-				<p>
-					I'm always happy to talk retrieval, evals, PEFT, or Document AI. Full profile and code on{' '}
-					<a href={AUTHOR.linkedin}>LinkedIn</a> and <a href={AUTHOR.github}>GitHub</a>.
-				</p>
+			<section class="bridge" aria-labelledby="bridge-title">
+				<div class="bridge-mark" aria-hidden="true">R/D</div>
+				<div>
+					<span class="net">RESEARCH → PRODUCTION</span>
+					<h2 id="bridge-title">The paper is a starting point.</h2>
+					<p>
+						I’m interested in what happens next: evaluation under distribution shift, cost and latency
+						constraints, developer ergonomics, and whether the system keeps working after launch.
+					</p>
+					<div class="bridge-links">
+						<a class="btn" href="/blog">Read engineering notes →</a>
+						<a class="btn ghost" href={AUTHOR.linkedin} target="_blank" rel="me noopener">Discuss on LinkedIn ↗</a>
+					</div>
+				</div>
 			</section>
 		</main>
 		<Footer />
-
-		<style>
-			.page-head {
-				margin-bottom: 2rem;
-			}
-			.page-head .net {
-				color: var(--accent);
-			}
-			.page-head h1 {
-				margin: 0.5rem 0 0.5rem;
-			}
-			.page-intro {
-				color: var(--muted);
-				max-width: 42rem;
-				margin: 0;
-			}
-			.papers {
-				list-style: none;
-				margin: 0;
-				padding: 0;
-				display: flex;
-				flex-direction: column;
-				gap: 1.1rem;
-			}
-			.paper {
-				display: flex;
-				gap: 1.25rem;
-				padding: 1.5rem 1.6rem;
-			}
-			.p-rail {
-				display: flex;
-				flex-direction: column;
-				gap: 0.35rem;
-				flex: none;
-				width: 3rem;
-				padding-top: 0.15rem;
-			}
-			.p-id {
-				color: var(--accent);
-			}
-			.p-year {
-				color: var(--muted);
-			}
-			.p-body {
-				min-width: 0;
-			}
-			.p-venue {
-				color: var(--live);
-			}
-			.p-title {
-				font-size: 1.28rem;
-				line-height: 1.25;
-				margin: 0.4rem 0 0.35rem;
-			}
-			.p-authors {
-				font-size: 0.85rem;
-				color: var(--muted);
-				margin: 0 0 0.7rem;
-				font-family: var(--font-mono);
-			}
-			.p-abstract {
-				color: var(--ink-soft);
-				font-size: 0.96rem;
-				line-height: 1.65;
-				margin: 0 0 1.1rem;
-				max-width: 46rem;
-			}
-			.p-foot {
-				display: flex;
-				justify-content: space-between;
-				align-items: center;
-				gap: 1rem;
-				flex-wrap: wrap;
-			}
-			.p-tags {
-				display: flex;
-				gap: 0.4rem;
-				flex-wrap: wrap;
-			}
-			.p-link {
-				font-family: var(--font-mono);
-				font-size: 0.82rem;
-				font-weight: 500;
-				text-decoration: none;
-				white-space: nowrap;
-			}
-			.p-link:hover {
-				text-decoration: underline;
-			}
-			.r-cta {
-				margin-top: 2.5rem;
-				padding: 2rem;
-			}
-			.r-cta .net {
-				color: var(--muted);
-			}
-			.r-cta h2 {
-				margin: 0.6rem 0 0.5rem;
-			}
-			.r-cta p {
-				color: var(--ink-soft);
-				margin: 0;
-				max-width: 40rem;
-			}
-			@media (max-width: 640px) {
-				.paper {
-					flex-direction: column;
-					gap: 0.6rem;
-				}
-				.p-rail {
-					flex-direction: row;
-					gap: 0.75rem;
-					width: auto;
-				}
-			}
-		</style>
 	</body>
 </html>
+
+<style>
+	main {
+		padding-top: 4.5rem;
+	}
+
+	.page-head {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 260px;
+		gap: clamp(3rem, 8vw, 8rem);
+		align-items: end;
+		padding-bottom: 4.25rem;
+		border-bottom: 2px solid var(--ink);
+	}
+
+	.page-head h1 {
+		margin: 1.15rem 0 1.4rem;
+		font-size: clamp(4rem, 3rem + 5vw, 7.5rem);
+		line-height: 0.88;
+	}
+
+	.page-head h1 em {
+		color: var(--accent);
+		font-family: var(--font-editorial);
+		font-weight: 400;
+	}
+
+	.head-main > p {
+		max-width: 690px;
+		margin: 0;
+		color: var(--ink-soft);
+		font-family: var(--font-editorial);
+		font-size: 1.23rem;
+		line-height: 1.55;
+	}
+
+	.research-stamp {
+		padding: 1rem 0 0;
+		border-top: 6px solid var(--signal);
+	}
+
+	.stamp-count {
+		display: block;
+		color: var(--accent);
+		font-family: var(--font-display);
+		font-size: 6rem;
+		font-weight: 750;
+		line-height: 0.8;
+		letter-spacing: -0.08em;
+	}
+
+	.research-stamp > strong {
+		display: block;
+		margin: 1rem 0 1.25rem;
+		font-family: var(--font-display);
+		font-size: 1rem;
+		line-height: 1.2;
+		text-transform: uppercase;
+	}
+
+	.stamp-meta {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		padding-top: 0.8rem;
+		border-top: var(--edge) solid var(--line);
+	}
+
+	.papers {
+		display: grid;
+		grid-template-columns: 230px minmax(0, 1fr);
+		gap: 4rem;
+		padding: 5rem 0 6.5rem;
+	}
+
+	.section-title {
+		position: sticky;
+		top: 8rem;
+		align-self: start;
+	}
+
+	.section-title h2 {
+		margin-top: 0.7rem;
+		font-size: 2.65rem;
+	}
+
+	.paper-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		border-top: 2px solid var(--ink);
+	}
+
+	.paper {
+		display: grid;
+		grid-template-columns: 90px minmax(0, 1fr);
+		gap: 2rem;
+		padding: 2.25rem 0 2.5rem;
+		border-bottom: var(--edge) solid var(--line-strong);
+	}
+
+	.paper-index {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.paper-no {
+		color: var(--accent);
+		font-family: var(--font-display);
+		font-size: 1.6rem;
+		font-weight: 750;
+		letter-spacing: -0.04em;
+	}
+
+	.venue {
+		color: var(--live);
+	}
+
+	.paper h3 {
+		max-width: 720px;
+		margin: 0.65rem 0 0.35rem;
+		font-size: clamp(1.55rem, 1.2rem + 1.25vw, 2.25rem);
+		line-height: 1.08;
+	}
+
+	.authors {
+		margin: 0 0 1rem;
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: 0.67rem;
+		letter-spacing: 0.03em;
+	}
+
+	.abstract {
+		max-width: 720px;
+		color: var(--ink-soft);
+		font-family: var(--font-editorial);
+		font-size: 1.06rem;
+		line-height: 1.58;
+	}
+
+	.paper-foot,
+	.paper-foot > div {
+		display: flex;
+		align-items: center;
+		gap: 0.42rem;
+		flex-wrap: wrap;
+	}
+
+	.paper-foot {
+		justify-content: space-between;
+		margin-top: 1.4rem;
+	}
+
+	.paper-foot > a {
+		color: var(--ink);
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 650;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	.paper-foot > a span {
+		color: var(--accent);
+	}
+
+	.paper-foot > a:hover {
+		color: var(--accent);
+	}
+
+	.bridge {
+		display: grid;
+		grid-template-columns: 200px minmax(0, 640px);
+		gap: 3rem;
+		align-items: start;
+		padding: clamp(2rem, 5vw, 4rem);
+		background: #171611;
+		color: #f4efe5;
+	}
+
+	.bridge-mark {
+		color: #ff7652;
+		font-family: var(--font-display);
+		font-size: 4.8rem;
+		font-weight: 800;
+		line-height: 0.9;
+		letter-spacing: -0.08em;
+	}
+
+	.bridge .net {
+		color: #ff7652;
+	}
+
+	.bridge h2 {
+		margin: 0.8rem 0;
+		color: #f4efe5;
+	}
+
+	.bridge p {
+		color: #bdb6aa;
+		font-family: var(--font-editorial);
+		font-size: 1.1rem;
+		line-height: 1.55;
+	}
+
+	.bridge-links {
+		display: flex;
+		gap: 0.7rem;
+		flex-wrap: wrap;
+		margin-top: 1.5rem;
+	}
+
+	.bridge .btn {
+		color: #171611;
+		background: #f4efe5;
+		border-color: #f4efe5;
+	}
+
+	.bridge .btn.ghost {
+		color: #f4efe5;
+		background: transparent;
+		border-color: #6b655b;
+	}
+
+	@media (max-width: 800px) {
+		.page-head,
+		.papers {
+			grid-template-columns: 1fr;
+		}
+
+		.page-head {
+			gap: 3rem;
+		}
+
+		.section-title {
+			position: static;
+		}
+
+		.papers {
+			gap: 2rem;
+		}
+
+		.bridge {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	@media (max-width: 540px) {
+		main {
+			padding-top: 3rem;
+		}
+
+		.page-head h1 {
+			font-size: 3.75rem;
+		}
+
+		.paper {
+			grid-template-columns: 1fr;
+			gap: 0.8rem;
+		}
+
+		.paper-index {
+			flex-direction: row;
+			align-items: baseline;
+			gap: 0.7rem;
+		}
+
+		.bridge-mark {
+			font-size: 3.3rem;
+		}
+	}
+</style>

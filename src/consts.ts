@@ -1,9 +1,9 @@
 // Global site metadata + structured data. Imported anywhere via `import`.
 
 export const SITE_TITLE = 'Kaushal Prajapati';
-export const SITE_TAGLINE = 'Staff AI/ML Engineer';
+export const SITE_TAGLINE = 'Engineering intelligence, in public.';
 export const SITE_DESCRIPTION =
-	'Kaushal Prajapati is a Staff AI/ML Engineer building the system layer behind production AI — agent runtimes, harnesses, evals, MCP developer platforms, and applied LLMs at scale. Writing on production AI engineering, deep-learning papers, and agentic systems.';
+	'Kaushal Prajapati writes about production AI engineering, agentic systems, software engineering, deep-learning papers, evals, retrieval, and LLM platforms.';
 
 export const AUTHOR = {
 	name: 'Kaushal Kumar Prajapati',

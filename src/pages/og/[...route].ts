@@ -14,20 +14,20 @@ const postPages = Object.fromEntries(
 
 const sitePages: Record<string, { title: string; description: string }> = {
 	home: {
-		title: 'I build the system layer behind production AI.',
-		description: `${SITE_TITLE} · ${AUTHOR.role} — agent runtimes, harnesses, evals, MCP platforms.`,
+		title: 'Engineering intelligence, in public.',
+		description: `${SITE_TITLE} · Field notes on production AI, agentic systems, deep-learning papers, and software engineering.`,
 	},
 	writing: {
-		title: 'Writing — production AI, from the parts that break at scale.',
-		description: 'Agent runtimes, evals, retrieval, and applied LLM engineering.',
+		title: 'Notes from the hard parts.',
+		description: 'Production AI, agent runtimes, evals, retrieval, and applied LLM engineering.',
 	},
 	research: {
-		title: 'Papers & Research',
-		description: 'Peer-reviewed work — EMNLP 2024 · Elsevier ASOC ×2.',
+		title: 'Research with a shipping bias.',
+		description: 'Peer-reviewed work at EMNLP and Elsevier Applied Soft Computing.',
 	},
 	about: {
-		title: `About ${SITE_TITLE}`,
-		description: `${AUTHOR.role} · 8+ years shipping production AI at scale.`,
+		title: 'I build the layer between model and product.',
+		description: `${AUTHOR.name} · ${AUTHOR.role} · 8+ years shipping production AI at scale.`,
 	},
 };
 
@@ -39,14 +39,14 @@ export const { getStaticPaths, GET } = await OGImageRoute({
 		title: page.title,
 		description: page.description,
 		bgGradient: [
-			[8, 11, 17],
-			[19, 26, 37],
+			[23, 22, 17],
+			[35, 31, 26],
 		],
-		border: { color: [77, 155, 255], width: 14, side: 'inline-start' },
+		border: { color: [255, 118, 82], width: 16, side: 'inline-start' },
 		padding: 70,
 		font: {
-			title: { color: [233, 237, 244], size: 62, lineHeight: 1.15, weight: 'Bold' },
-			description: { color: [124, 135, 152], size: 28, lineHeight: 1.4 },
+			title: { color: [244, 239, 229], size: 62, lineHeight: 1.1, weight: 'Bold' },
+			description: { color: [189, 182, 170], size: 28, lineHeight: 1.4 },
 		},
 	}),
 });

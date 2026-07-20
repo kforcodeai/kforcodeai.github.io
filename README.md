@@ -3,7 +3,7 @@
 Personal site and blog of **Kaushal Prajapati** — Staff AI/ML Engineer.
 Built with [Astro](https://astro.build), deployed to GitHub Pages via GitHub Actions.
 
-**Live:** https://kforcodeai.github.io
+**Live:** https://kforcode.dev
 
 ## Write a new post
 

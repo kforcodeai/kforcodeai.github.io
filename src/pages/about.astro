@@ -3,254 +3,604 @@ import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/Footer.astro';
 import Header from '../components/Header.astro';
 import SectionHead from '../components/SectionHead.astro';
-import { AUTHOR, PAPERS, SITE_TITLE } from '../consts';
+import { AUTHOR, PAPERS, SITE_KEYWORDS, SITE_TITLE } from '../consts';
 
 const description =
-	'Kaushal Prajapati — Staff AI/ML Engineer building agent runtimes, harnesses, evals, and MCP developer platforms. 8+ years shipping production AI, with publications at EMNLP 2024 and Elsevier ASOC.';
+	'Kaushal Prajapati is a Staff AI/ML Engineer with 8+ years building production agent runtimes, evals, retrieval, MCP platforms, and Document AI systems.';
 
 const timeline = [
 	{
 		org: 'HighLevel',
 		role: 'Staff AI/ML Engineer · platform direction',
-		net: 'T0 · NOW',
-		body: 'Architected the unified AI runtime and agent harness — the shared execution layer behind Voice AI, Conversation AI, Agent Studio, Ask AI, Ads Copilot, and the Email Agent. 15M+ conversations and 800B+ tokens per quarter across 250K+ locations at 99.9% success. Also built the headless developer platform — MCP server, agent SDK, CLI, and plugin system exposing 600+ operations.',
+		net: 'NOW',
+		body: 'Architected the unified AI runtime and agent harness behind Voice AI, Conversation AI, Agent Studio, Ask AI, Ads Copilot, and Email Agent. The platform carries 15M+ conversations and 800B+ tokens per quarter. Also built a headless developer platform—MCP server, SDK, CLI, and plugin system—exposing 600+ operations.',
+		impact: '6+ AI surfaces · 99.9% success',
 	},
 	{
 		org: 'Zania AI',
 		role: 'Applied AI Engineer · compliance agents',
-		net: 'T1',
-		body: 'Auto Compliance Agents for SOC 2, NIST, HIPAA, and third-party risk. Pushed evidence-retrieval F1@10 from 86% to 97% with hybrid retrieval, reranking, and citation-span ranking; built post-training and eval release gates.',
+		net: 'PREVIOUS',
+		body: 'Built Auto Compliance Agents for SOC 2, NIST, HIPAA, and third-party risk. Improved evidence-retrieval F1@10 from 86% to 97% using hybrid retrieval, reranking, citation-span ranking, post-training, and eval release gates.',
+		impact: '86% → 97% evidence F1@10',
 	},
 	{
 		org: 'Intellect AI',
 		role: 'Lead ML Engineer · Document AI',
-		net: 'T2',
-		body: 'Led commercialization of an Underwriting Copilot (multi-agent Document AI). Replaced 23+ document-specific models with one layout-aware extraction architecture, and cut AWS Textract spend 70% across 6M+ PDFs.',
+		net: 'PREVIOUS',
+		body: 'Led commercialization of an Underwriting Copilot. Replaced 23+ document-specific models with one layout-aware extraction architecture and cut AWS Textract spend 70% across 6M+ PDFs.',
+		impact: '23 models → 1 shared architecture',
 	},
 	{
-		org: 'First American (Eagle Labs)',
+		org: 'First American · Eagle Labs',
 		role: 'R&D Engineer',
-		net: 'T3',
-		body: 'Parcel-level risk models that cut title-insurance claims 17%, and Plymouth — a document-classification framework for 2M+ docs across 1,400+ classes.',
+		net: 'EARLY WORK',
+		body: 'Built parcel-level risk models that cut title-insurance claims 17%, plus Plymouth, a document-classification framework for 2M+ documents across more than 1,400 classes.',
+		impact: '17% fewer claims',
 	},
 ];
 
 const toolbox = [
 	'Python', 'TypeScript', 'PyTorch', 'Hugging Face', 'FastAPI', 'Node.js', 'vLLM',
-	'LoRA/QLoRA/PEFT', 'MCP', 'RAG', 'evals', 'AWS', 'GCP', 'Azure', 'Docker',
+	'LoRA / QLoRA / PEFT', 'MCP', 'RAG', 'Evals', 'AWS', 'GCP', 'Azure', 'Docker',
 	'Kubernetes', 'Postgres', 'Redis', 'OpenSearch',
 ];
+
+const profileLd = {
+	'@context': 'https://schema.org',
+	'@type': 'ProfilePage',
+	name: `About ${AUTHOR.name}`,
+	url: `${AUTHOR.site}/about/`,
+	mainEntity: {
+		'@type': 'Person',
+		name: AUTHOR.name,
+		alternateName: AUTHOR.handle,
+		jobTitle: AUTHOR.role,
+		worksFor: { '@type': 'Organization', name: 'HighLevel' },
+		knowsAbout: SITE_KEYWORDS,
+		sameAs: [AUTHOR.github, AUTHOR.linkedin, ...PAPERS.map((paper) => paper.url)],
+	},
+};
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead title={`About · ${SITE_TITLE}`} description={description} ogImage="/og/about.png" />
+		<BaseHead title={`About Kaushal Prajapati · Staff AI/ML Engineer`} description={description} ogImage="/og/about.png" />
+		<script type="application/ld+json" set:html={JSON.stringify(profileLd)} />
 	</head>
 	<body>
 		<Header />
 		<main>
 			<header class="page-head">
-				<span class="net">PROFILE::{AUTHOR.handle.toUpperCase()}</span>
-				<h1>About</h1>
-				<p class="lede">
-					I'm <strong>Kaushal Kumar Prajapati</strong>, a Staff AI/ML Engineer with 8+ years turning
-					research-grade models into production platforms that serve millions. I work on the{' '}
-					<strong>system layer</strong> behind AI products — the runtime, agent harness, evals, and
-					developer surface that most demos skip but every real product depends on.
-				</p>
+				<div class="head-main">
+					<span class="eyebrow">Engineer · researcher · writer</span>
+					<h1>I build the layer<br />between <em>model</em><br />and <em>product.</em></h1>
+					<p>
+						I’m <strong>Kaushal Kumar Prajapati</strong>, a Staff AI/ML Engineer with 8+ years
+						turning research-grade ideas into AI platforms that serve millions.
+					</p>
+				</div>
+				<aside class="profile-card">
+					<div class="portrait" aria-hidden="true">
+						<span>K</span>
+						<i>KP / 08+</i>
+					</div>
+					<div class="profile-status"><i class="dot"></i><span class="net">BUILDING AT HIGHLEVEL</span></div>
+					<dl>
+						<div><dt>Based</dt><dd>Bengaluru, India</dd></div>
+						<div><dt>Focus</dt><dd>Production AI</dd></div>
+						<div><dt>Published</dt><dd>EMNLP · Elsevier</dd></div>
+					</dl>
+				</aside>
 			</header>
 
-			<section class="block">
-				<SectionHead net="SEC::TIMELINE" />
-				<ol class="timeline">
-					{
-						timeline.map((t) => (
-							<li class="tl-item">
-								<span class="tl-marker" aria-hidden="true" />
-								<div class="node tl-card">
-									<span class="tl-net net">{t.net}</span>
-									<h3 class="tl-org">{t.org}</h3>
-									<span class="tl-role net">{t.role}</span>
-									<p class="tl-body">{t.body}</p>
+			<section class="bio" aria-labelledby="bio-title">
+				<SectionHead net="THE SHORT VERSION / 01" />
+				<div class="bio-grid">
+					<h2 id="bio-title">Research depth.<br />Platform instincts.<br /><span>Operator’s judgment.</span></h2>
+					<div class="bio-copy">
+						<p class="lead">
+							My work sits in the system layer most AI demos skip: runtimes, agent harnesses,
+							evaluation gates, retrieval, memory, model routing, tool authorization, and the
+							developer surfaces that make all of it usable.
+						</p>
+						<p>
+							I care about leverage. A good platform decision makes every product team faster;
+							a good explanation lets other engineers borrow the lesson without paying the same
+							failure cost. That is why I write here.
+						</p>
+					</div>
+				</div>
+			</section>
+
+			<section class="experience" aria-labelledby="experience-title">
+				<SectionHead net="SELECTED EXPERIENCE / 02" />
+				<div class="experience-grid">
+					<div class="experience-intro">
+						<h2 id="experience-title">A career spent making AI survive contact with reality.</h2>
+						<p>From risk modeling and Document AI to compliance agents and shared execution platforms.</p>
+					</div>
+					<ol class="timeline">
+						{timeline.map((item, i) => (
+							<li>
+								<div class="timeline-index">
+									<span class="timeline-no">{String(i + 1).padStart(2, '0')}</span>
+									<span class="net">{item.net}</span>
+								</div>
+								<div class="timeline-body">
+									<div class="role-head">
+										<div><h3>{item.org}</h3><span class="role">{item.role}</span></div>
+										<strong>{item.impact}</strong>
+									</div>
+									<p>{item.body}</p>
 								</div>
 							</li>
-						))
-					}
-				</ol>
+						))}
+					</ol>
+				</div>
 			</section>
 
-			<section class="block">
-				<SectionHead net="SEC::RESEARCH" href="/research" label="all papers" />
-				<div class="node research-box">
+			<section class="research-toolkit">
+				<div class="research-block">
+					<span class="net">PEER REVIEW / 03</span>
+					<h2>Research that informs the build.</h2>
+					<p>{PAPERS.length} peer-reviewed papers on Document AI, privacy, clinical summarization, and parameter-efficient fine-tuning.</p>
 					<ul>
-						{
-							PAPERS.map((p) => (
-								<li>
-									<a href={p.url} target="_blank" rel="noopener">
-										{p.title}
-									</a>
-									<span class="net"> · {p.venue}</span>
-								</li>
-							))
-						}
+						{PAPERS.map((paper, i) => (
+							<li><a href={paper.url} target="_blank" rel="noopener"><span>P{String(i + 1).padStart(2, '0')}</span>{paper.title}<i>↗</i></a></li>
+						))}
 					</ul>
+					<a class="btn" href="/research">Explore the research →</a>
+				</div>
+				<div class="toolkit-block">
+					<span class="net">WORKING TOOLKIT / 04</span>
+					<h2>Tools are choices, not identity.</h2>
+					<p>I choose for reliability, operability, and team velocity. These are the tools currently in the working set.</p>
+					<div class="toolbox">{toolbox.map((tool) => <span class="chip chip--plain">{tool}</span>)}</div>
 				</div>
 			</section>
 
-			<section class="block">
-				<SectionHead net="SEC::TOOLBOX" />
-				<div class="toolbox">
-					{toolbox.map((tool) => <span class="chip chip--plain">{tool}</span>)}
-				</div>
-			</section>
-
-			<section class="node contact">
-				<span class="net">SEC::CONTACT</span>
-				<h2>Get in touch</h2>
-				<p>
-					I write here about building production AI systems. If that's your world too — or you're
-					hiring for Staff/Principal AI platform work — reach out.
-				</p>
-				<div class="cta">
-					<a class="btn" href={AUTHOR.linkedin}>LinkedIn →</a>
-					<a class="btn ghost" href={`mailto:${AUTHOR.email}`}>Email</a>
-					<a class="btn ghost" href={AUTHOR.github}>GitHub</a>
+			<section class="contact" aria-labelledby="contact-title">
+				<div class="contact-mark" aria-hidden="true">LET’S<br />BUILD.</div>
+				<div>
+					<span class="net">OPEN CHANNEL / 05</span>
+					<h2 id="contact-title">Working on the hard part of AI?</h2>
+					<p>
+						I’m always interested in thoughtful conversations about Staff/Principal AI platform work,
+						research-to-production problems, and teams building durable agentic systems.
+					</p>
+					<div class="contact-links">
+						<a class="btn contact-primary" href={AUTHOR.linkedin} target="_blank" rel="me noopener">Connect on LinkedIn ↗</a>
+						<a class="btn ghost" href={`mailto:${AUTHOR.email}`}>Send an email</a>
+						<a class="btn ghost" href={AUTHOR.github} target="_blank" rel="me noopener">GitHub ↗</a>
+					</div>
 				</div>
 			</section>
 		</main>
 		<Footer />
-
-		<style>
-			.page-head {
-				max-width: 46rem;
-				margin-bottom: 3rem;
-			}
-			.page-head .net {
-				color: var(--accent);
-			}
-			.page-head h1 {
-				margin: 0.5rem 0 0.75rem;
-			}
-			.lede {
-				font-size: 1.14rem;
-				line-height: 1.6;
-				color: var(--ink-soft);
-				margin: 0;
-			}
-			.block {
-				margin-bottom: 3.25rem;
-			}
-
-			/* Timeline — schematic bus with node markers */
-			.timeline {
-				list-style: none;
-				margin: 0;
-				padding: 0;
-			}
-			.tl-item {
-				position: relative;
-				padding-left: 2rem;
-				padding-bottom: 1.1rem;
-			}
-			.tl-item::before {
-				/* the bus line */
-				content: '';
-				position: absolute;
-				left: 5px;
-				top: 6px;
-				bottom: -6px;
-				width: 1px;
-				background: var(--line-strong);
-			}
-			.tl-item:last-child::before {
-				display: none;
-			}
-			.tl-marker {
-				position: absolute;
-				left: 0;
-				top: 6px;
-				width: 11px;
-				height: 11px;
-				border-radius: 50%;
-				background: var(--bg);
-				border: 2px solid var(--accent);
-			}
-			.tl-item:first-child .tl-marker {
-				background: var(--accent);
-				box-shadow: 0 0 0 4px var(--accent-soft);
-			}
-			.tl-card {
-				padding: 1.2rem 1.4rem;
-			}
-			.tl-net {
-				color: var(--accent);
-			}
-			.tl-org {
-				margin: 0.35rem 0 0.15rem;
-				font-size: 1.2rem;
-			}
-			.tl-role {
-				color: var(--muted);
-				text-transform: none;
-				letter-spacing: 0.02em;
-			}
-			.tl-body {
-				margin: 0.7rem 0 0;
-				color: var(--ink-soft);
-				font-size: 0.96rem;
-				line-height: 1.65;
-			}
-
-			.research-box ul {
-				list-style: none;
-				margin: 0;
-				padding: 0.4rem 0.6rem;
-			}
-			.research-box li {
-				padding: 0.55rem 0;
-				border-bottom: var(--edge) solid var(--line);
-				font-size: 0.98rem;
-			}
-			.research-box li:last-child {
-				border-bottom: none;
-			}
-			.research-box a {
-				text-decoration: none;
-				font-weight: 500;
-			}
-			.research-box a:hover {
-				text-decoration: underline;
-			}
-			.research-box .net {
-				color: var(--muted);
-			}
-
-			.toolbox {
-				display: flex;
-				flex-wrap: wrap;
-				gap: 0.5rem;
-			}
-
-			.contact {
-				padding: 2.25rem 2rem;
-			}
-			.contact .net {
-				color: var(--muted);
-			}
-			.contact h2 {
-				margin: 0.6rem 0 0.5rem;
-			}
-			.contact p {
-				color: var(--ink-soft);
-				max-width: 40rem;
-			}
-			.cta {
-				display: flex;
-				gap: 0.7rem;
-				flex-wrap: wrap;
-				margin-top: 1.3rem;
-			}
-		</style>
 	</body>
 </html>
+
+<style>
+	main {
+		padding-top: 4.5rem;
+	}
+
+	.page-head {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 290px;
+		gap: clamp(3rem, 8vw, 8rem);
+		align-items: end;
+		padding-bottom: 4.5rem;
+		border-bottom: 2px solid var(--ink);
+	}
+
+	.page-head h1 {
+		margin: 1.1rem 0 1.4rem;
+		font-size: clamp(4rem, 3rem + 5vw, 7.25rem);
+		line-height: 0.88;
+	}
+
+	.page-head h1 em {
+		color: var(--accent);
+		font-family: var(--font-editorial);
+		font-weight: 400;
+	}
+
+	.head-main > p {
+		max-width: 680px;
+		margin: 0;
+		color: var(--ink-soft);
+		font-family: var(--font-editorial);
+		font-size: 1.25rem;
+		line-height: 1.55;
+	}
+
+	.profile-card {
+		border-top: 6px solid var(--signal);
+	}
+
+	.portrait {
+		position: relative;
+		display: grid;
+		place-items: center;
+		height: 190px;
+		margin: 1rem 0;
+		border: var(--edge) solid var(--line-strong);
+		background:
+			linear-gradient(135deg, transparent 48%, var(--line) 49%, var(--line) 50%, transparent 51%),
+			var(--bg-inset);
+		overflow: hidden;
+	}
+
+	.portrait span {
+		color: var(--accent);
+		font-family: var(--font-display);
+		font-size: 8.5rem;
+		font-weight: 800;
+		line-height: 1;
+		letter-spacing: -0.1em;
+	}
+
+	.portrait i {
+		position: absolute;
+		right: 0.6rem;
+		bottom: 0.45rem;
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: 0.58rem;
+		font-style: normal;
+		letter-spacing: 0.08em;
+	}
+
+	.profile-status {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.7rem 0;
+		border-top: var(--edge) solid var(--line);
+	}
+
+	.profile-card dl {
+		margin: 0;
+		border-top: var(--edge) solid var(--line);
+	}
+
+	.profile-card dl div {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 0.5rem 0;
+		border-bottom: var(--edge) solid var(--line);
+		font-family: var(--font-mono);
+		font-size: 0.61rem;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	.profile-card dt {
+		color: var(--muted);
+	}
+
+	.profile-card dd {
+		margin: 0;
+		font-weight: 650;
+	}
+
+	.bio,
+	.experience {
+		padding-top: 6rem;
+	}
+
+	.bio-grid {
+		display: grid;
+		grid-template-columns: 0.9fr 1.1fr;
+		gap: clamp(3rem, 8vw, 8rem);
+		align-items: start;
+		padding-top: 2rem;
+	}
+
+	.bio-grid h2 span {
+		color: var(--accent);
+		font-family: var(--font-editorial);
+		font-weight: 400;
+	}
+
+	.bio-copy {
+		padding-top: 0.35rem;
+	}
+
+	.bio-copy p {
+		color: var(--muted);
+		font-family: var(--font-editorial);
+		font-size: 1.08rem;
+		line-height: 1.65;
+	}
+
+	.bio-copy .lead {
+		color: var(--ink-soft);
+		font-size: 1.27rem;
+	}
+
+	.experience-grid {
+		display: grid;
+		grid-template-columns: 280px minmax(0, 1fr);
+		gap: 4rem;
+		padding-top: 2rem;
+	}
+
+	.experience-intro {
+		position: sticky;
+		top: 8rem;
+		align-self: start;
+	}
+
+	.experience-intro h2 {
+		font-size: 2.3rem;
+	}
+
+	.experience-intro p {
+		color: var(--muted);
+		font-family: var(--font-editorial);
+		font-size: 1rem;
+		line-height: 1.55;
+	}
+
+	.timeline {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		border-top: 2px solid var(--ink);
+	}
+
+	.timeline li {
+		display: grid;
+		grid-template-columns: 75px minmax(0, 1fr);
+		gap: 1.5rem;
+		padding: 2rem 0;
+		border-bottom: var(--edge) solid var(--line-strong);
+	}
+
+	.timeline-index {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.timeline-no {
+		color: var(--accent);
+		font-family: var(--font-display);
+		font-size: 1.65rem;
+		font-weight: 750;
+		line-height: 1;
+	}
+
+	.timeline-index .net {
+		margin-top: 0.35rem;
+		font-size: 0.52rem;
+	}
+
+	.role-head {
+		display: flex;
+		align-items: start;
+		justify-content: space-between;
+		gap: 1.5rem;
+	}
+
+	.role-head h3 {
+		font-size: 1.45rem;
+	}
+
+	.role {
+		display: block;
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: 0.63rem;
+		letter-spacing: 0.03em;
+		text-transform: uppercase;
+	}
+
+	.role-head > strong {
+		flex: none;
+		color: var(--live);
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		letter-spacing: 0.03em;
+		text-transform: uppercase;
+	}
+
+	.timeline-body > p {
+		margin: 1rem 0 0;
+		color: var(--ink-soft);
+		font-family: var(--font-editorial);
+		font-size: 1.04rem;
+		line-height: 1.58;
+	}
+
+	.research-toolkit {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		margin-top: 6rem;
+		border-top: 2px solid var(--ink);
+		border-bottom: 2px solid var(--ink);
+	}
+
+	.research-block,
+	.toolkit-block {
+		padding: 3rem;
+	}
+
+	.research-block {
+		border-right: var(--edge) solid var(--line-strong);
+	}
+
+	.research-toolkit h2 {
+		margin-top: 0.8rem;
+		font-size: 2.2rem;
+	}
+
+	.research-toolkit p {
+		color: var(--muted);
+		font-family: var(--font-editorial);
+		font-size: 1rem;
+		line-height: 1.55;
+	}
+
+	.research-block ul {
+		list-style: none;
+		margin: 1.5rem 0;
+		padding: 0;
+		border-top: var(--edge) solid var(--line);
+	}
+
+	.research-block li {
+		border-bottom: var(--edge) solid var(--line);
+	}
+
+	.research-block li a {
+		display: grid;
+		grid-template-columns: 26px 1fr auto;
+		gap: 0.55rem;
+		padding: 0.65rem 0;
+		color: var(--ink-soft);
+		font-size: 0.77rem;
+		line-height: 1.35;
+		text-decoration: none;
+	}
+
+	.research-block li a:hover {
+		color: var(--accent);
+	}
+
+	.research-block li span,
+	.research-block li i {
+		color: var(--accent);
+		font-family: var(--font-mono);
+		font-size: 0.56rem;
+		font-style: normal;
+	}
+
+	.toolbox {
+		display: flex;
+		gap: 0.45rem;
+		flex-wrap: wrap;
+		margin-top: 1.5rem;
+	}
+
+	.contact {
+		display: grid;
+		grid-template-columns: 250px minmax(0, 650px);
+		gap: 4rem;
+		align-items: start;
+		margin-top: 6rem;
+		padding: clamp(2rem, 5vw, 4rem);
+		background: #171611;
+		color: #f4efe5;
+	}
+
+	.contact-mark {
+		color: #ff7652;
+		font-family: var(--font-display);
+		font-size: clamp(3rem, 5vw, 5rem);
+		font-weight: 800;
+		line-height: 0.8;
+		letter-spacing: -0.07em;
+	}
+
+	.contact .net {
+		color: #ff7652;
+	}
+
+	.contact h2 {
+		margin: 0.8rem 0;
+		color: #f4efe5;
+	}
+
+	.contact p {
+		color: #bdb6aa;
+		font-family: var(--font-editorial);
+		font-size: 1.1rem;
+		line-height: 1.55;
+	}
+
+	.contact-links {
+		display: flex;
+		gap: 0.7rem;
+		flex-wrap: wrap;
+		margin-top: 1.5rem;
+	}
+
+	.contact-primary {
+		color: #171611;
+		background: #f4efe5;
+		border-color: #f4efe5;
+	}
+
+	.contact .btn.ghost {
+		color: #f4efe5;
+		border-color: #625d53;
+	}
+
+	@media (max-width: 850px) {
+		.page-head,
+		.bio-grid,
+		.experience-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.page-head {
+			gap: 3rem;
+		}
+
+		.profile-card {
+			max-width: 420px;
+		}
+
+		.experience-intro {
+			position: static;
+		}
+
+		.research-toolkit {
+			grid-template-columns: 1fr;
+		}
+
+		.research-block {
+			border-right: 0;
+			border-bottom: var(--edge) solid var(--line-strong);
+		}
+
+		.contact {
+			grid-template-columns: 1fr;
+			gap: 2rem;
+		}
+	}
+
+	@media (max-width: 560px) {
+		main {
+			padding-top: 3rem;
+		}
+
+		.page-head h1 {
+			font-size: 3.55rem;
+		}
+
+		.bio,
+		.experience {
+			padding-top: 4.5rem;
+		}
+
+		.timeline li {
+			grid-template-columns: 48px minmax(0, 1fr);
+			gap: 0.8rem;
+		}
+
+		.role-head {
+			flex-direction: column;
+			gap: 0.7rem;
+		}
+
+		.research-block,
+		.toolkit-block {
+			padding: 2rem 1.25rem;
+		}
+	}
+</style>

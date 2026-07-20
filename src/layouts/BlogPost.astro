@@ -5,6 +5,7 @@ import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/Footer.astro';
 import FormattedDate from '../components/FormattedDate.astro';
 import Header from '../components/Header.astro';
+import { AUTHOR } from '../consts';
 
 type Props = CollectionEntry<'blog'>['data'] & {
 	ogImage?: string;
@@ -29,7 +30,7 @@ const {
 	related = [],
 } = Astro.props;
 
-const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
+const toc = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
 ---
 
 <html lang="en">
@@ -41,291 +42,496 @@ const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
 			type="article"
 			pubDate={pubDate}
 			updatedDate={updatedDate}
+			tags={tags}
 		/>
 	</head>
 
 	<body>
+		<div class="reading-progress" aria-hidden="true"><span></span></div>
 		<Header />
-		<main class="article-layout">
+
+		<main class="article-shell">
 			<article>
 				<header class="article-head">
-					<span class="net kicker">LOG · {tags?.[0] ?? 'writing'}</span>
-					<h1>{title}</h1>
-					<p class="a-desc">{description}</p>
-					<div class="a-meta">
-						<span class="dot"></span>
-						<FormattedDate class="net" date={pubDate} />
-						{minutes && <span class="net">· {minutes} MIN READ</span>}
-						{
-							updatedDate && (
-								<span class="net">
-									· UPD <FormattedDate date={updatedDate} />
-								</span>
-							)
-						}
+					<a class="back net" href="/blog">WRITING / ARCHIVE</a>
+					<div class="title-block">
+						<span class="eyebrow">Field note · {tags?.[0] ?? 'engineering'}</span>
+						<h1>{title}</h1>
+						<p class="article-dek">{description}</p>
 					</div>
-					{
-						tags && tags.length > 0 && (
-							<div class="a-tags">
-								{tags.map((tag: string) => (
-									<a class="chip" href={`/tags/${tag}/`}>
-										{tag}
-									</a>
-								))}
-							</div>
-						)
-					}
+					<div class="byline">
+						<div class="author-mark" aria-hidden="true">K</div>
+						<div class="byline-author">
+							<strong>{AUTHOR.name}</strong>
+							<span>{AUTHOR.role}</span>
+						</div>
+						<div class="byline-meta net">
+							<span><FormattedDate date={pubDate} /></span>
+							{minutes && <span>{minutes} MIN READ</span>}
+							{updatedDate && <span>UPDATED <FormattedDate date={updatedDate} /></span>}
+						</div>
+					</div>
+					{tags && tags.length > 0 && (
+						<div class="article-tags">
+							{tags.map((tag: string) => <a class="chip" href={`/tags/${tag}/`}>{tag}</a>)}
+						</div>
+					)}
 				</header>
 
 				<div class="prose">
 					<slot />
 				</div>
 
-				<footer class="article-foot">
-					<a class="net back" href="/blog">← all writing</a>
+				<footer class="article-end">
+					<div class="end-mark" aria-hidden="true">//</div>
+					<div>
+						<span class="net">ABOUT THE AUTHOR</span>
+						<h2>Written from production, not the sidelines.</h2>
+						<p>
+							Kaushal builds AI platforms and agent infrastructure serving millions of conversations.
+							He writes to make the hard-won systems lessons portable.
+						</p>
+						<div class="end-links">
+							<a href="/about">About Kaushal →</a>
+							<a href={AUTHOR.linkedin} target="_blank" rel="me noopener">LinkedIn ↗</a>
+						</div>
+					</div>
 				</footer>
 			</article>
 
-			{
-				toc.length > 1 && (
-					<aside class="toc" aria-label="Table of contents">
-						<div class="toc-inner node">
-							<span class="net toc-title">ON THIS PAGE</span>
-							<nav>
-								<ol>
-									{toc.map((h) => (
-										<li class:list={[{ sub: h.depth === 3 }]}>
-											<a href={`#${h.slug}`}>{h.text}</a>
-										</li>
-									))}
-								</ol>
-							</nav>
-						</div>
-					</aside>
-				)
-			}
+			{toc.length > 1 && (
+				<aside class="toc" aria-label="Table of contents">
+					<div class="toc-rule"></div>
+					<span class="net toc-title">IN THIS NOTE</span>
+					<nav>
+						<ol>
+							{toc.map((heading, i) => (
+								<li class:list={[{ sub: heading.depth === 3 }]}>
+									<a href={`#${heading.slug}`}>
+										<span>{String(i + 1).padStart(2, '0')}</span>{heading.text}
+									</a>
+								</li>
+							))}
+						</ol>
+					</nav>
+					<div class="toc-foot net"><i class="dot"></i> KFORCODE / FIELD NOTES</div>
+				</aside>
+			)}
 		</main>
 
-		{
-			(newer || older || related.length > 0) && (
-				<section class="more wrap">
-					{(newer || older) && (
-						<div class="adjacent">
-							{older ? (
-								<a class="node node--link adj" href={`/blog/${older.id}/`}>
-									<span class="net">← previous</span>
-									<span class="adj-t">{older.data.title}</span>
-								</a>
-							) : (
-								<span />
-							)}
-							{newer && (
-								<a class="node node--link adj adj-r" href={`/blog/${newer.id}/`}>
-									<span class="net">next →</span>
-									<span class="adj-t">{newer.data.title}</span>
-								</a>
-							)}
-						</div>
-					)}
-					{related.length > 0 && (
-						<div class="related">
-							<div class="section-head">
-								<span class="net">SEC::RELATED</span>
-								<span class="rule" />
-							</div>
-							<div class="related-grid">
-								{related.map((p) => (
-									<a class="node node--link rel" href={`/blog/${p.id}/`}>
-										<span class="net">{(p.data.tags ?? [])[0] ?? 'post'}</span>
-										<span class="rel-t">{p.data.title}</span>
-									</a>
-								))}
-							</div>
-						</div>
-					)}
-				</section>
-			)
-		}
+		{(newer || older || related.length > 0) && (
+			<section class="more wrap">
+				<div class="more-head">
+					<span class="net">KEEP READING</span>
+					<span class="rule"></span>
+				</div>
+
+				{(newer || older) && (
+					<div class="adjacent">
+						{older ? (
+							<a class="adj" href={`/blog/${older.id}/`}>
+								<span class="net">← PREVIOUS NOTE</span>
+								<strong>{older.data.title}</strong>
+							</a>
+						) : <span />}
+						{newer && (
+							<a class="adj adj-next" href={`/blog/${newer.id}/`}>
+								<span class="net">NEXT NOTE →</span>
+								<strong>{newer.data.title}</strong>
+							</a>
+						)}
+					</div>
+				)}
+
+				{related.length > 0 && (
+					<div class="related">
+						{related.map((post, i) => (
+							<a class="related-note node" href={`/blog/${post.id}/`}>
+								<span class="net">RELATED / {String(i + 1).padStart(2, '0')}</span>
+								<strong>{post.data.title}</strong>
+								<span>Read note ↗</span>
+							</a>
+						))}
+					</div>
+				)}
+			</section>
+		)}
+
 		<Footer />
 
 		<script is:inline>
-			// Add hover anchor links to prose headings (ids provided by Astro).
 			(function () {
-				document.querySelectorAll('.prose h2[id], .prose h3[id]').forEach(function (h) {
-					var a = document.createElement('a');
-					a.href = '#' + h.id;
-					a.className = 'anchor';
-					a.textContent = '#';
-					a.setAttribute('aria-label', 'Link to this section');
-					h.appendChild(a);
+				document.querySelectorAll('.prose h2[id], .prose h3[id]').forEach(function (heading) {
+					var anchor = document.createElement('a');
+					anchor.href = '#' + heading.id;
+					anchor.className = 'anchor';
+					anchor.textContent = '#';
+					anchor.setAttribute('aria-label', 'Link to this section');
+					heading.appendChild(anchor);
 				});
+
+				var progress = document.querySelector('.reading-progress span');
+				function updateProgress() {
+					var height = document.documentElement.scrollHeight - window.innerHeight;
+					var value = height > 0 ? Math.min(100, (window.scrollY / height) * 100) : 0;
+					if (progress) progress.style.width = value + '%';
+				}
+				updateProgress();
+				window.addEventListener('scroll', updateProgress, { passive: true });
 			})();
 		</script>
-
-		<style>
-			.article-layout {
-				display: grid;
-				grid-template-columns: minmax(0, 44rem) 13rem;
-				justify-content: center;
-				gap: 3.5rem;
-				align-items: start;
-				padding-top: 2.75rem;
-			}
-			article {
-				min-width: 0;
-			}
-			.article-head {
-				margin-bottom: 2.25rem;
-				padding-bottom: 1.75rem;
-				border-bottom: var(--edge) solid var(--line);
-			}
-			.kicker {
-				color: var(--accent);
-			}
-			.article-head h1 {
-				margin: 0.6rem 0 0.6rem;
-			}
-			.a-desc {
-				font-size: 1.12rem;
-				line-height: 1.55;
-				color: var(--ink-soft);
-				margin: 0 0 1.1rem;
-			}
-			.a-meta {
-				display: flex;
-				align-items: center;
-				gap: 0.4rem;
-				flex-wrap: wrap;
-				color: var(--muted);
-				margin-bottom: 1rem;
-			}
-			.a-tags {
-				display: flex;
-				gap: 0.4rem;
-				flex-wrap: wrap;
-			}
-			.article-foot {
-				margin-top: 3rem;
-				padding-top: 1.5rem;
-				border-top: var(--edge) solid var(--line);
-			}
-			.back {
-				text-decoration: none;
-				color: var(--muted);
-			}
-			.back:hover {
-				color: var(--accent);
-			}
-
-			/* TOC */
-			.toc {
-				position: sticky;
-				top: 5rem;
-				align-self: start;
-			}
-			.toc-inner {
-				padding: 1rem 1.1rem;
-			}
-			.toc-title {
-				display: block;
-				margin-bottom: 0.7rem;
-				color: var(--accent);
-			}
-			.toc ol {
-				list-style: none;
-				margin: 0;
-				padding: 0;
-				display: flex;
-				flex-direction: column;
-				gap: 0.5rem;
-			}
-			.toc li.sub {
-				padding-left: 0.9rem;
-			}
-			.toc a {
-				text-decoration: none;
-				color: var(--muted);
-				font-size: 0.85rem;
-				line-height: 1.35;
-				transition: color 0.15s var(--ease);
-			}
-			.toc a:hover {
-				color: var(--accent);
-			}
-
-			/* More / adjacent / related */
-			.more {
-				margin-top: 3.5rem;
-			}
-			.adjacent {
-				display: grid;
-				grid-template-columns: 1fr 1fr;
-				gap: 1rem;
-				margin-bottom: 2.5rem;
-			}
-			.adj {
-				padding: 1.1rem 1.25rem;
-				display: flex;
-				flex-direction: column;
-				gap: 0.4rem;
-			}
-			.adj .net {
-				color: var(--muted);
-			}
-			.adj-r {
-				text-align: right;
-			}
-			.adj-t {
-				font-family: var(--font-display);
-				font-weight: 500;
-				color: var(--ink);
-				letter-spacing: -0.01em;
-			}
-			.node--link:hover .adj-t {
-				color: var(--accent);
-			}
-			.related-grid {
-				display: grid;
-				grid-template-columns: 1fr 1fr;
-				gap: 1rem;
-			}
-			.rel {
-				padding: 1.1rem 1.25rem;
-				display: flex;
-				flex-direction: column;
-				gap: 0.4rem;
-			}
-			.rel .net {
-				color: var(--accent);
-			}
-			.rel-t {
-				font-family: var(--font-display);
-				font-weight: 500;
-				color: var(--ink);
-				letter-spacing: -0.01em;
-			}
-			.node--link:hover .rel-t {
-				color: var(--accent);
-			}
-
-			@media (max-width: 960px) {
-				.article-layout {
-					grid-template-columns: minmax(0, 44rem);
-					justify-content: center;
-				}
-				.toc {
-					display: none;
-				}
-			}
-			@media (max-width: 640px) {
-				.adjacent,
-				.related-grid {
-					grid-template-columns: 1fr;
-				}
-				.adj-r {
-					text-align: left;
-				}
-			}
-		</style>
 	</body>
 </html>
+
+<style>
+	.reading-progress {
+		position: fixed;
+		z-index: 100;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 3px;
+	}
+
+	.reading-progress span {
+		display: block;
+		width: 0;
+		height: 100%;
+		background: var(--accent);
+	}
+
+	.article-shell {
+		display: grid;
+		grid-template-columns: minmax(0, 48rem) 15rem;
+		justify-content: center;
+		gap: clamp(3rem, 7vw, 7rem);
+		align-items: start;
+		padding-top: 3.5rem;
+	}
+
+	article {
+		min-width: 0;
+	}
+
+	.back {
+		color: var(--muted);
+		text-decoration: none;
+	}
+
+	.back:hover {
+		color: var(--accent);
+	}
+
+	.title-block {
+		margin: 2.5rem 0 2rem;
+	}
+
+	.title-block h1 {
+		margin: 1rem 0 1.25rem;
+		font-size: clamp(3.2rem, 2rem + 4vw, 5.8rem);
+		line-height: 0.95;
+		text-wrap: balance;
+	}
+
+	.article-dek {
+		max-width: 44rem;
+		margin: 0;
+		color: var(--ink-soft);
+		font-family: var(--font-editorial);
+		font-size: clamp(1.2rem, 1rem + 0.55vw, 1.42rem);
+		line-height: 1.53;
+	}
+
+	.byline {
+		display: grid;
+		grid-template-columns: 42px minmax(0, 1fr) auto;
+		gap: 0.8rem;
+		align-items: center;
+		padding: 1rem 0;
+		border-top: 2px solid var(--ink);
+		border-bottom: var(--edge) solid var(--line-strong);
+	}
+
+	.author-mark {
+		display: grid;
+		place-items: center;
+		width: 38px;
+		height: 38px;
+		color: #fff7ec;
+		background: var(--accent);
+		font-family: var(--font-display);
+		font-weight: 800;
+	}
+
+	.byline-author {
+		display: flex;
+		flex-direction: column;
+		line-height: 1.25;
+	}
+
+	.byline-author strong {
+		font-family: var(--font-display);
+		font-size: 0.82rem;
+	}
+
+	.byline-author span {
+		color: var(--muted);
+		font-size: 0.72rem;
+	}
+
+	.byline-meta {
+		display: flex;
+		gap: 0.8rem;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+	}
+
+	.article-tags {
+		display: flex;
+		gap: 0.4rem;
+		flex-wrap: wrap;
+		padding: 1rem 0 3.5rem;
+	}
+
+	.article-end {
+		display: grid;
+		grid-template-columns: 95px 1fr;
+		gap: 2rem;
+		margin-top: 4rem;
+		padding: 2rem;
+		border-top: 5px solid var(--signal);
+		background: var(--bg-inset);
+	}
+
+	.end-mark {
+		color: var(--accent);
+		font-family: var(--font-display);
+		font-size: 4rem;
+		font-weight: 800;
+		line-height: 1;
+		letter-spacing: -0.1em;
+	}
+
+	.article-end h2 {
+		margin: 0.6rem 0;
+		font-size: 1.55rem;
+	}
+
+	.article-end p {
+		max-width: 520px;
+		color: var(--muted);
+		font-family: var(--font-editorial);
+		font-size: 1rem;
+		line-height: 1.5;
+	}
+
+	.end-links {
+		display: flex;
+		gap: 1.1rem;
+		flex-wrap: wrap;
+	}
+
+	.end-links a {
+		color: var(--ink);
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 650;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	.end-links a:hover {
+		color: var(--accent);
+	}
+
+	.toc {
+		position: sticky;
+		top: 8rem;
+		align-self: start;
+	}
+
+	.toc-rule {
+		width: 100%;
+		height: 5px;
+		margin-bottom: 1rem;
+		background: var(--signal);
+	}
+
+	.toc-title {
+		display: block;
+		margin-bottom: 1rem;
+		color: var(--ink);
+	}
+
+	.toc ol {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		border-top: var(--edge) solid var(--line);
+	}
+
+	.toc li {
+		border-bottom: var(--edge) solid var(--line);
+	}
+
+	.toc li.sub {
+		padding-left: 0.65rem;
+	}
+
+	.toc a {
+		display: grid;
+		grid-template-columns: 24px 1fr;
+		gap: 0.35rem;
+		padding: 0.55rem 0;
+		color: var(--muted);
+		font-size: 0.72rem;
+		line-height: 1.35;
+		text-decoration: none;
+	}
+
+	.toc a span {
+		color: var(--accent);
+		font-family: var(--font-mono);
+		font-size: 0.55rem;
+	}
+
+	.toc a:hover {
+		color: var(--ink);
+	}
+
+	.toc-foot {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 1.2rem;
+		font-size: 0.54rem;
+	}
+
+	.more {
+		margin-top: 5rem;
+	}
+
+	.more-head {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 1rem;
+		align-items: center;
+		margin-bottom: 1.5rem;
+	}
+
+	.more-head .rule {
+		height: 1px;
+		background: var(--line-strong);
+	}
+
+	.adjacent,
+	.related {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
+	}
+
+	.adjacent {
+		margin-bottom: 1rem;
+	}
+
+	.adj {
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+		padding: 1.2rem 0;
+		border-top: 2px solid var(--ink);
+		border-bottom: var(--edge) solid var(--line-strong);
+		color: var(--ink);
+		text-decoration: none;
+	}
+
+	.adj-next {
+		align-items: flex-end;
+		text-align: right;
+	}
+
+	.adj strong {
+		max-width: 480px;
+		font-family: var(--font-display);
+		font-size: 1.02rem;
+		line-height: 1.35;
+	}
+
+	.adj:hover strong {
+		color: var(--accent);
+	}
+
+	.related-note {
+		display: flex;
+		flex-direction: column;
+		gap: 0.65rem;
+		min-height: 170px;
+		padding: 1.3rem;
+		color: var(--ink);
+		text-decoration: none;
+	}
+
+	.related-note .net,
+	.related-note > span:last-child {
+		color: var(--accent);
+	}
+
+	.related-note strong {
+		font-family: var(--font-display);
+		font-size: 1.05rem;
+		line-height: 1.3;
+	}
+
+	.related-note > span:last-child {
+		margin-top: auto;
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
+		font-weight: 650;
+		text-transform: uppercase;
+	}
+
+	@media (max-width: 980px) {
+		.article-shell {
+			grid-template-columns: minmax(0, 48rem);
+		}
+
+		.toc {
+			display: none;
+		}
+	}
+
+	@media (max-width: 640px) {
+		.article-shell {
+			padding-top: 2.5rem;
+		}
+
+		.byline {
+			grid-template-columns: 42px 1fr;
+		}
+
+		.byline-meta {
+			grid-column: 1 / -1;
+			justify-content: flex-start;
+		}
+
+		.article-end {
+			grid-template-columns: 1fr;
+			padding: 1.5rem;
+		}
+
+		.end-mark {
+			font-size: 2.8rem;
+		}
+
+		.adjacent,
+		.related {
+			grid-template-columns: 1fr;
+		}
+
+		.adj-next {
+			align-items: flex-start;
+			text-align: left;
+		}
+	}
+</style>
