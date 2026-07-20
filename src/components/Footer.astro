@@ -4,101 +4,74 @@ const year = new Date().getFullYear();
 ---
 
 <footer>
-	<div class="wrap footer-grid">
-		<div class="footer-callout">
-			<span class="eyebrow">Keep the signal</span>
-			<h2>Useful ideas.<br />No content sludge.</h2>
-			<p>Follow new field notes on LinkedIn, or add the site’s RSS feed to your reader.</p>
-			<div class="footer-actions">
-				<a class="btn" href={AUTHOR.linkedin} target="_blank" rel="me noopener">Follow on LinkedIn ↗</a>
-				<a class="btn ghost" href="/rss.xml">Subscribe via RSS</a>
-			</div>
+	<div class="wrap footer-main">
+		<div>
+			<a class="footer-brand" href="/"><span>~/</span>kforcode.dev</a>
+			<p>Notes on production AI, agentic systems, deep learning, and software engineering.</p>
 		</div>
-
-		<div class="footer-index">
-			<div class="footer-group">
-				<span class="net">Read</span>
-				<a href="/blog">Writing archive</a>
-				<a href="/research">Research &amp; papers</a>
-				<a href="/about">About Kaushal</a>
-			</div>
-			<div class="footer-group">
-				<span class="net">Connect</span>
-				<a href={AUTHOR.github} target="_blank" rel="me noopener">GitHub ↗</a>
-				<a href={AUTHOR.linkedin} target="_blank" rel="me noopener">LinkedIn ↗</a>
-				<a href={`mailto:${AUTHOR.email}`}>Email ↗</a>
-			</div>
-		</div>
+		<nav aria-label="Footer navigation">
+			<a href="/blog">writing</a>
+			<a href="/research">research</a>
+			<a href="/about">about</a>
+			<a href="/rss.xml">rss</a>
+			<a href={AUTHOR.github} target="_blank" rel="me noopener">github ↗</a>
+			<a href={AUTHOR.linkedin} target="_blank" rel="me noopener">linkedin ↗</a>
+		</nav>
 	</div>
-
 	<div class="wrap footer-base">
 		<span>© {year} {AUTHOR.name}</span>
-		<span>Built in public · Bengaluru, India</span>
-		<span class="edition">K/C · EDITION 03</span>
+		<span>Built with Astro. No tracking.</span>
 	</div>
 </footer>
 
 <style>
 	footer {
 		margin-top: 2rem;
-		padding: 4.5rem 0 1.4rem;
-		border-top: 2px solid var(--ink);
-		background: var(--bg-panel);
+		padding: 3rem 0 1.5rem;
+		border-top: 1px solid var(--line);
 	}
 
-	.footer-grid {
-		display: grid;
-		grid-template-columns: 1.5fr 1fr;
-		gap: 5rem;
-		align-items: end;
-	}
-
-	.footer-callout h2 {
-		max-width: 620px;
-		margin: 0.8rem 0 0.7rem;
-		font-size: clamp(2.6rem, 1.8rem + 3vw, 4.65rem);
-	}
-
-	.footer-callout p {
-		max-width: 35rem;
-		color: var(--muted);
-		font-size: 0.94rem;
-	}
-
-	.footer-actions {
+	.footer-main {
 		display: flex;
-		gap: 0.7rem;
-		flex-wrap: wrap;
-		margin-top: 1.4rem;
+		align-items: start;
+		justify-content: space-between;
+		gap: 3rem;
 	}
 
-	.footer-index {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 2rem;
-		padding: 1.5rem 0 0.2rem 2rem;
-		border-left: var(--edge) solid var(--line-strong);
-	}
-
-	.footer-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.6rem;
-	}
-
-	.footer-group .net {
-		margin-bottom: 0.4rem;
-		color: var(--accent);
-	}
-
-	.footer-group a {
-		color: var(--ink-soft);
-		font-size: 0.84rem;
-		font-weight: 550;
+	.footer-brand {
+		color: var(--ink);
+		font-family: var(--font-mono);
+		font-size: 0.86rem;
+		font-weight: 600;
 		text-decoration: none;
 	}
 
-	.footer-group a:hover {
+	.footer-brand span {
+		color: var(--accent);
+	}
+
+	.footer-main p {
+		max-width: 31rem;
+		margin: 0.65rem 0 0;
+		color: var(--muted);
+		font-size: 0.82rem;
+	}
+
+	footer nav {
+		display: flex;
+		gap: 0.9rem;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+	}
+
+	footer nav a {
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-decoration: none;
+	}
+
+	footer nav a:hover {
 		color: var(--accent);
 	}
 
@@ -106,41 +79,22 @@ const year = new Date().getFullYear();
 		display: flex;
 		justify-content: space-between;
 		gap: 1rem;
-		margin-top: 4rem;
+		margin-top: 2rem;
 		padding-top: 1rem;
-		border-top: var(--edge) solid var(--line);
+		border-top: 1px solid var(--line);
 		color: var(--muted);
 		font-family: var(--font-mono);
-		font-size: 0.61rem;
-		font-weight: 550;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
+		font-size: 0.6rem;
 	}
 
-	.edition {
-		color: var(--accent);
-	}
-
-	@media (max-width: 760px) {
-		footer {
-			padding-top: 3.2rem;
-		}
-
-		.footer-grid {
-			grid-template-columns: 1fr;
-			gap: 3rem;
-		}
-
-		.footer-index {
-			padding: 1.5rem 0 0;
-			border-top: var(--edge) solid var(--line);
-			border-left: 0;
-		}
-
+	@media (max-width: 650px) {
+		.footer-main,
 		.footer-base {
-			align-items: flex-start;
 			flex-direction: column;
-			margin-top: 3rem;
+		}
+
+		footer nav {
+			justify-content: flex-start;
 		}
 	}
 </style>

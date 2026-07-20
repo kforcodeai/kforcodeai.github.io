@@ -9,8 +9,7 @@ import { byDateDesc, tagCounts } from '../../lib/utils';
 
 export async function getStaticPaths() {
 	const posts = await getCollection('blog');
-	const tags = tagCounts(posts).map((item) => item.tag);
-	return tags.map((tag) => ({
+	return tagCounts(posts).map(({ tag }) => ({
 		params: { tag },
 		props: { posts: posts.filter((post) => (post.data.tags ?? []).includes(tag)).sort(byDateDesc) },
 	}));
@@ -25,26 +24,19 @@ const blurb = topic?.blurb ?? `Production AI engineering notes tagged “${tag}�
 
 <!doctype html>
 <html lang="en">
-	<head>
-		<BaseHead title={`${label} articles · ${SITE_TITLE}`} description={`${blurb} Browse ${posts.length} article${posts.length === 1 ? '' : 's'} in this topic.`} />
-	</head>
+	<head><BaseHead title={`${label} articles · ${SITE_TITLE}`} description={`${blurb} Browse ${posts.length} article${posts.length === 1 ? '' : 's'} in this topic.`} /></head>
 	<body>
 		<Header />
 		<main>
 			<header class="page-head">
-				<div>
-					<a class="net back" href="/blog">← WRITING ARCHIVE</a>
-					<span class="eyebrow">TOPIC / {topic?.net ?? tag?.toUpperCase()}</span>
-					<h1>{label}</h1>
-					<p>{blurb}</p>
-				</div>
-				<span class="count" aria-label={`${posts.length} posts`}>{String(posts.length).padStart(2, '0')}</span>
+				<a href="/blog" class="net back">← writing</a>
+				<div class="prompt net"><span>~/writing</span>$ rg "{tag}"</div>
+				<h1>{label}</h1>
+				<p>{blurb}</p>
 			</header>
-
-			<section class="topic-posts" aria-label={`Articles about ${label}`}>
-				<h2 class="sr-only">Articles about {label}</h2>
-				<div class="list-head"><span class="net">{posts.length} MATCHING NOTES</span><span class="rule"></span></div>
-				<div class="posts">{posts.map((post, i) => <PostCard post={post} index={i + 1} variant="card" />)}</div>
+			<section aria-labelledby="topic-title">
+				<h2 id="topic-title" class="net">{posts.length} matching post{posts.length === 1 ? '' : 's'}</h2>
+				<div class="post-list">{posts.map((post, i) => <PostCard post={post} index={i + 1} variant="row" />)}</div>
 			</section>
 		</main>
 		<Footer />
@@ -52,88 +44,39 @@ const blurb = topic?.blurb ?? `Production AI engineering notes tagged “${tag}�
 </html>
 
 <style>
-	main {
-		padding-top: 4rem;
-	}
-
 	.page-head {
-		display: flex;
-		align-items: end;
-		justify-content: space-between;
-		gap: 3rem;
-		padding-bottom: 3.5rem;
-		border-bottom: 2px solid var(--ink);
+		max-width: 720px;
+		padding: 1rem 0 3.5rem;
 	}
 
 	.back {
-		display: block;
-		margin-bottom: 2rem;
+		display: inline-block;
+		margin-bottom: 2.5rem;
 		color: var(--muted);
 		text-decoration: none;
 	}
 
-	.back:hover {
+	.prompt {
+		margin-bottom: 1rem;
+		text-transform: none;
+	}
+
+	.prompt span {
 		color: var(--accent);
 	}
 
 	.page-head h1 {
-		margin: 0.8rem 0 1rem;
-		font-size: clamp(4rem, 3rem + 5vw, 7rem);
+		font-size: clamp(2.8rem, 6vw, 4.6rem);
 	}
 
 	.page-head p {
-		max-width: 650px;
-		margin: 0;
+		margin: 1rem 0 0;
+		color: var(--muted);
+		font-size: 1rem;
+	}
+
+	section > h2 {
+		margin-bottom: 1rem;
 		color: var(--ink-soft);
-		font-family: var(--font-editorial);
-		font-size: 1.18rem;
-		line-height: 1.55;
-	}
-
-	.count {
-		color: var(--accent);
-		font-family: var(--font-display);
-		font-size: 6.5rem;
-		font-weight: 750;
-		line-height: 0.8;
-		letter-spacing: -0.08em;
-	}
-
-	.topic-posts {
-		padding-top: 4rem;
-	}
-
-	.list-head {
-		display: grid;
-		grid-template-columns: auto 1fr;
-		gap: 1rem;
-		align-items: center;
-		margin-bottom: 1.5rem;
-	}
-
-	.rule {
-		height: 1px;
-		background: var(--line-strong);
-	}
-
-	.posts {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 1rem;
-	}
-
-	@media (max-width: 680px) {
-		.page-head {
-			align-items: flex-start;
-			flex-direction: column;
-		}
-
-		.count {
-			font-size: 4.5rem;
-		}
-
-		.posts {
-			grid-template-columns: 1fr;
-		}
 	}
 </style>

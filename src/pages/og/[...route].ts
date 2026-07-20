@@ -14,19 +14,19 @@ const postPages = Object.fromEntries(
 
 const sitePages: Record<string, { title: string; description: string }> = {
 	home: {
-		title: 'Engineering intelligence, in public.',
+		title: 'Engineering AI systems that survive production.',
 		description: `${SITE_TITLE} · Field notes on production AI, agentic systems, deep-learning papers, and software engineering.`,
 	},
 	writing: {
-		title: 'Notes from the hard parts.',
+		title: 'Field notes from production.',
 		description: 'Production AI, agent runtimes, evals, retrieval, and applied LLM engineering.',
 	},
 	research: {
-		title: 'Research with a shipping bias.',
+		title: 'Research informed by real systems.',
 		description: 'Peer-reviewed work at EMNLP and Elsevier Applied Soft Computing.',
 	},
 	about: {
-		title: 'I build the layer between model and product.',
+		title: 'I build the system layer between models and products.',
 		description: `${AUTHOR.name} · ${AUTHOR.role} · 8+ years shipping production AI at scale.`,
 	},
 };
@@ -39,14 +39,14 @@ export const { getStaticPaths, GET } = await OGImageRoute({
 		title: page.title,
 		description: page.description,
 		bgGradient: [
-			[23, 22, 17],
-			[35, 31, 26],
+			[11, 11, 11],
+			[17, 17, 17],
 		],
-		border: { color: [255, 118, 82], width: 16, side: 'inline-start' },
+		border: { color: [74, 222, 128], width: 12, side: 'inline-start' },
 		padding: 70,
 		font: {
-			title: { color: [244, 239, 229], size: 62, lineHeight: 1.1, weight: 'Bold' },
-			description: { color: [189, 182, 170], size: 28, lineHeight: 1.4 },
+			title: { color: [241, 241, 241], size: 62, lineHeight: 1.1, weight: 'Bold' },
+			description: { color: [155, 155, 155], size: 28, lineHeight: 1.4 },
 		},
 	}),
 });

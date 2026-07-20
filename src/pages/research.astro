@@ -4,9 +4,7 @@ import Footer from '../components/Footer.astro';
 import Header from '../components/Header.astro';
 import { AUTHOR, PAPERS, SITE_TITLE } from '../consts';
 
-const description =
-	'Peer-reviewed AI research by Kaushal Prajapati on Document AI, privacy, clinical summarization, LoRA, DoRA, and parameter-efficient fine-tuning.';
-
+const description = 'Peer-reviewed AI research by Kaushal Prajapati on Document AI, privacy, clinical summarization, LoRA, DoRA, and parameter-efficient fine-tuning.';
 const papersLd = PAPERS.map((paper) => ({
 	'@context': 'https://schema.org',
 	'@type': 'ScholarlyArticle',
@@ -31,46 +29,28 @@ const papersLd = PAPERS.map((paper) => ({
 		<Header />
 		<main>
 			<header class="page-head">
-				<div class="head-main">
-					<span class="eyebrow">Peer review · field work · implementation</span>
-					<h1>Research with a<br /><em>shipping bias.</em></h1>
-					<p>
-						My published work explores the same boundary as my engineering: how to make deep-learning
-						systems more useful, efficient, and responsible in the real world.
-					</p>
-				</div>
-				<aside class="research-stamp" aria-label="Research overview">
-					<span class="stamp-count">{String(PAPERS.length).padStart(2, '0')}</span>
-					<strong>peer-reviewed<br />publications</strong>
-					<div class="stamp-meta net">
-						<span>EMNLP · MAIN</span>
-						<span>ELSEVIER · ASOC ×2</span>
-						<span>2024—2025</span>
-					</div>
-				</aside>
+				<div class="prompt net"><span>~/kforcode</span>$ ls research/</div>
+				<h1>Research</h1>
+				<p>
+					Peer-reviewed work at the intersection of deep learning and applied systems:
+					Document AI, privacy, clinical summarization, and parameter-efficient fine-tuning.
+				</p>
 			</header>
 
 			<section class="papers" aria-labelledby="papers-title">
-				<div class="section-title">
-					<span class="net">PUBLICATION INDEX / 01</span>
-					<h2 id="papers-title">The papers</h2>
-				</div>
-
-				<ol class="paper-list">
+				<h2 id="papers-title" class="net">{PAPERS.length} publications</h2>
+				<ol>
 					{PAPERS.map((paper, i) => (
-						<li class="paper">
-							<div class="paper-index">
-								<span class="paper-no">P{String(i + 1).padStart(2, '0')}</span>
-								<span class="net">{paper.year}</span>
-							</div>
+						<li>
+							<div class="paper-meta net"><span>paper_{String(i + 1).padStart(2, '0')}</span><span>{paper.year}</span></div>
 							<div class="paper-body">
 								<span class="venue net">{paper.venue}</span>
 								<h3>{paper.title}</h3>
 								<p class="authors">{paper.authors}</p>
-								<p class="abstract">{paper.abstract}</p>
+								<p>{paper.abstract}</p>
 								<div class="paper-foot">
 									<div>{paper.tags.map((tag) => <span class="chip">{tag}</span>)}</div>
-									<a href={paper.url} target="_blank" rel="noopener">Read the paper <span>↗</span></a>
+									<a href={paper.url} target="_blank" rel="noopener">read paper ↗</a>
 								</div>
 							</div>
 						</li>
@@ -78,20 +58,9 @@ const papersLd = PAPERS.map((paper) => ({
 				</ol>
 			</section>
 
-			<section class="bridge" aria-labelledby="bridge-title">
-				<div class="bridge-mark" aria-hidden="true">R/D</div>
-				<div>
-					<span class="net">RESEARCH → PRODUCTION</span>
-					<h2 id="bridge-title">The paper is a starting point.</h2>
-					<p>
-						I’m interested in what happens next: evaluation under distribution shift, cost and latency
-						constraints, developer ergonomics, and whether the system keeps working after launch.
-					</p>
-					<div class="bridge-links">
-						<a class="btn" href="/blog">Read engineering notes →</a>
-						<a class="btn ghost" href={AUTHOR.linkedin} target="_blank" rel="me noopener">Discuss on LinkedIn ↗</a>
-					</div>
-				</div>
+			<section class="contact">
+				<div><span class="net">research_to_production</span><h2>Interested in the implementation?</h2><p>I write about what happens after the paper: evaluation, reliability, latency, cost, and operating the system in production.</p></div>
+				<a class="btn ghost" href="/blog">read the writing →</a>
 			</section>
 		</main>
 		<Footer />
@@ -99,275 +68,151 @@ const papersLd = PAPERS.map((paper) => ({
 </html>
 
 <style>
-	main {
-		padding-top: 4.5rem;
+	.page-head {
+		max-width: 760px;
+		padding: 2.5rem 0 3.5rem;
 	}
 
-	.page-head {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) 260px;
-		gap: clamp(3rem, 8vw, 8rem);
-		align-items: end;
-		padding-bottom: 4.25rem;
-		border-bottom: 2px solid var(--ink);
+	.prompt {
+		margin-bottom: 1rem;
+		text-transform: none;
+	}
+
+	.prompt span,
+	.paper-meta span:first-child,
+	.venue {
+		color: var(--accent);
 	}
 
 	.page-head h1 {
-		margin: 1.15rem 0 1.4rem;
-		font-size: clamp(4rem, 3rem + 5vw, 7.5rem);
-		line-height: 0.88;
+		font-size: clamp(2.8rem, 6vw, 4.6rem);
 	}
 
-	.page-head h1 em {
-		color: var(--accent);
-		font-family: var(--font-editorial);
-		font-weight: 400;
+	.page-head p {
+		margin: 1.1rem 0 0;
+		color: var(--muted);
+		font-size: 1.02rem;
 	}
 
-	.head-main > p {
-		max-width: 690px;
-		margin: 0;
+	.papers > h2 {
+		margin-bottom: 1rem;
 		color: var(--ink-soft);
-		font-family: var(--font-editorial);
-		font-size: 1.23rem;
-		line-height: 1.55;
 	}
 
-	.research-stamp {
-		padding: 1rem 0 0;
-		border-top: 6px solid var(--signal);
-	}
-
-	.stamp-count {
-		display: block;
-		color: var(--accent);
-		font-family: var(--font-display);
-		font-size: 6rem;
-		font-weight: 750;
-		line-height: 0.8;
-		letter-spacing: -0.08em;
-	}
-
-	.research-stamp > strong {
-		display: block;
-		margin: 1rem 0 1.25rem;
-		font-family: var(--font-display);
-		font-size: 1rem;
-		line-height: 1.2;
-		text-transform: uppercase;
-	}
-
-	.stamp-meta {
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-		padding-top: 0.8rem;
-		border-top: var(--edge) solid var(--line);
-	}
-
-	.papers {
-		display: grid;
-		grid-template-columns: 230px minmax(0, 1fr);
-		gap: 4rem;
-		padding: 5rem 0 6.5rem;
-	}
-
-	.section-title {
-		position: sticky;
-		top: 8rem;
-		align-self: start;
-	}
-
-	.section-title h2 {
-		margin-top: 0.7rem;
-		font-size: 2.65rem;
-	}
-
-	.paper-list {
+	.papers ol {
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		border-top: 2px solid var(--ink);
 	}
 
-	.paper {
+	.papers li {
 		display: grid;
-		grid-template-columns: 90px minmax(0, 1fr);
+		grid-template-columns: 130px minmax(0, 1fr);
 		gap: 2rem;
-		padding: 2.25rem 0 2.5rem;
-		border-bottom: var(--edge) solid var(--line-strong);
+		padding: 1.75rem 0;
+		border-top: 1px solid var(--line);
 	}
 
-	.paper-index {
+	.papers li:last-child {
+		border-bottom: 1px solid var(--line);
+	}
+
+	.paper-meta {
 		display: flex;
 		flex-direction: column;
-		gap: 0.2rem;
+		gap: 0.3rem;
+		padding-top: 0.15rem;
+		font-size: 0.63rem;
 	}
 
-	.paper-no {
-		color: var(--accent);
-		font-family: var(--font-display);
-		font-size: 1.6rem;
-		font-weight: 750;
-		letter-spacing: -0.04em;
-	}
-
-	.venue {
-		color: var(--live);
-	}
-
-	.paper h3 {
-		max-width: 720px;
-		margin: 0.65rem 0 0.35rem;
-		font-size: clamp(1.55rem, 1.2rem + 1.25vw, 2.25rem);
-		line-height: 1.08;
+	.paper-body h3 {
+		margin: 0.45rem 0 0.3rem;
+		font-size: 1.3rem;
 	}
 
 	.authors {
-		margin: 0 0 1rem;
+		margin: 0 0 0.8rem;
 		color: var(--muted);
 		font-family: var(--font-mono);
-		font-size: 0.67rem;
-		letter-spacing: 0.03em;
+		font-size: 0.65rem;
 	}
 
-	.abstract {
+	.paper-body > p:last-of-type {
 		max-width: 720px;
-		color: var(--ink-soft);
-		font-family: var(--font-editorial);
-		font-size: 1.06rem;
-		line-height: 1.58;
+		color: var(--muted);
+		font-size: 0.88rem;
 	}
 
 	.paper-foot,
 	.paper-foot > div {
 		display: flex;
 		align-items: center;
-		gap: 0.42rem;
+		gap: 0.4rem;
 		flex-wrap: wrap;
 	}
 
 	.paper-foot {
 		justify-content: space-between;
-		margin-top: 1.4rem;
+		margin-top: 1.2rem;
 	}
 
 	.paper-foot > a {
-		color: var(--ink);
+		color: var(--muted);
 		font-family: var(--font-mono);
 		font-size: 0.68rem;
-		font-weight: 650;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-	}
-
-	.paper-foot > a span {
-		color: var(--accent);
+		text-decoration: none;
 	}
 
 	.paper-foot > a:hover {
 		color: var(--accent);
 	}
 
-	.bridge {
-		display: grid;
-		grid-template-columns: 200px minmax(0, 640px);
-		gap: 3rem;
-		align-items: start;
-		padding: clamp(2rem, 5vw, 4rem);
-		background: #171611;
-		color: #f4efe5;
-	}
-
-	.bridge-mark {
-		color: #ff7652;
-		font-family: var(--font-display);
-		font-size: 4.8rem;
-		font-weight: 800;
-		line-height: 0.9;
-		letter-spacing: -0.08em;
-	}
-
-	.bridge .net {
-		color: #ff7652;
-	}
-
-	.bridge h2 {
-		margin: 0.8rem 0;
-		color: #f4efe5;
-	}
-
-	.bridge p {
-		color: #bdb6aa;
-		font-family: var(--font-editorial);
-		font-size: 1.1rem;
-		line-height: 1.55;
-	}
-
-	.bridge-links {
+	.contact {
 		display: flex;
-		gap: 0.7rem;
-		flex-wrap: wrap;
-		margin-top: 1.5rem;
+		align-items: center;
+		justify-content: space-between;
+		gap: 2rem;
+		margin-top: 4rem;
+		padding: 1.75rem;
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		background: var(--bg-panel);
 	}
 
-	.bridge .btn {
-		color: #171611;
-		background: #f4efe5;
-		border-color: #f4efe5;
+	.contact h2 {
+		margin-top: 0.5rem;
+		font-size: 1.5rem;
 	}
 
-	.bridge .btn.ghost {
-		color: #f4efe5;
-		background: transparent;
-		border-color: #6b655b;
+	.contact p {
+		max-width: 650px;
+		margin: 0.5rem 0 0;
+		color: var(--muted);
+		font-size: 0.84rem;
 	}
 
-	@media (max-width: 800px) {
-		.page-head,
-		.papers {
-			grid-template-columns: 1fr;
-		}
+	.contact .btn {
+		flex: none;
+	}
 
+	@media (max-width: 650px) {
 		.page-head {
-			gap: 3rem;
+			padding-top: 1rem;
 		}
 
-		.section-title {
-			position: static;
-		}
-
-		.papers {
-			gap: 2rem;
-		}
-
-		.bridge {
+		.papers li {
 			grid-template-columns: 1fr;
-		}
-	}
-
-	@media (max-width: 540px) {
-		main {
-			padding-top: 3rem;
-		}
-
-		.page-head h1 {
-			font-size: 3.75rem;
-		}
-
-		.paper {
-			grid-template-columns: 1fr;
-			gap: 0.8rem;
-		}
-
-		.paper-index {
-			flex-direction: row;
-			align-items: baseline;
 			gap: 0.7rem;
 		}
 
-		.bridge-mark {
-			font-size: 3.3rem;
+		.paper-meta {
+			flex-direction: row;
+			justify-content: space-between;
+		}
+
+		.contact {
+			align-items: flex-start;
+			flex-direction: column;
 		}
 	}
 </style>

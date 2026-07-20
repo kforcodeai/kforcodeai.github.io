@@ -16,147 +16,57 @@ type Props = CollectionEntry<'blog'>['data'] & {
 	related?: CollectionEntry<'blog'>[];
 };
 
-const {
-	title,
-	description,
-	pubDate,
-	updatedDate,
-	tags,
-	ogImage,
-	headings = [],
-	minutes,
-	newer,
-	older,
-	related = [],
-} = Astro.props;
-
+const { title, description, pubDate, updatedDate, tags, ogImage, headings = [], minutes, newer, older, related = [] } = Astro.props;
 const toc = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
 ---
 
 <html lang="en">
 	<head>
-		<BaseHead
-			title={`${title} · Kaushal Prajapati`}
-			description={description}
-			ogImage={ogImage}
-			type="article"
-			pubDate={pubDate}
-			updatedDate={updatedDate}
-			tags={tags}
-		/>
+		<BaseHead title={`${title} · Kaushal Prajapati`} description={description} ogImage={ogImage} type="article" pubDate={pubDate} updatedDate={updatedDate} tags={tags} />
 	</head>
-
 	<body>
 		<div class="reading-progress" aria-hidden="true"><span></span></div>
 		<Header />
-
-		<main class="article-shell">
+		<main class="article-layout">
 			<article>
 				<header class="article-head">
-					<a class="back net" href="/blog">WRITING / ARCHIVE</a>
-					<div class="title-block">
-						<span class="eyebrow">Field note · {tags?.[0] ?? 'engineering'}</span>
-						<h1>{title}</h1>
-						<p class="article-dek">{description}</p>
+					<a class="net back" href="/blog">← writing</a>
+					<div class="prompt net"><span>~/writing</span>$ cat {title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.md</div>
+					<h1>{title}</h1>
+					<p class="description">{description}</p>
+					<div class="meta">
+						<span>{AUTHOR.name}</span><span><FormattedDate date={pubDate} /></span>{minutes && <span>{minutes} min read</span>}{updatedDate && <span>updated <FormattedDate date={updatedDate} /></span>}
 					</div>
-					<div class="byline">
-						<div class="author-mark" aria-hidden="true">K</div>
-						<div class="byline-author">
-							<strong>{AUTHOR.name}</strong>
-							<span>{AUTHOR.role}</span>
-						</div>
-						<div class="byline-meta net">
-							<span><FormattedDate date={pubDate} /></span>
-							{minutes && <span>{minutes} MIN READ</span>}
-							{updatedDate && <span>UPDATED <FormattedDate date={updatedDate} /></span>}
-						</div>
-					</div>
-					{tags && tags.length > 0 && (
-						<div class="article-tags">
-							{tags.map((tag: string) => <a class="chip" href={`/tags/${tag}/`}>{tag}</a>)}
-						</div>
-					)}
+					{tags && tags.length > 0 && <div class="tags">{tags.map((tag: string) => <a class="chip" href={`/tags/${tag}/`}>{tag}</a>)}</div>}
 				</header>
 
-				<div class="prose">
-					<slot />
-				</div>
+				<div class="prose"><slot /></div>
 
-				<footer class="article-end">
-					<div class="end-mark" aria-hidden="true">//</div>
-					<div>
-						<span class="net">ABOUT THE AUTHOR</span>
-						<h2>Written from production, not the sidelines.</h2>
-						<p>
-							Kaushal builds AI platforms and agent infrastructure serving millions of conversations.
-							He writes to make the hard-won systems lessons portable.
-						</p>
-						<div class="end-links">
-							<a href="/about">About Kaushal →</a>
-							<a href={AUTHOR.linkedin} target="_blank" rel="me noopener">LinkedIn ↗</a>
-						</div>
-					</div>
+				<footer class="author-note">
+					<span class="net">author</span>
+					<p><strong>{AUTHOR.name}</strong> is a Staff AI/ML Engineer building production AI platforms and agent infrastructure.</p>
+					<div><a href="/about">about →</a><a href={AUTHOR.linkedin} target="_blank" rel="me noopener">linkedin ↗</a></div>
 				</footer>
 			</article>
 
 			{toc.length > 1 && (
 				<aside class="toc" aria-label="Table of contents">
-					<div class="toc-rule"></div>
-					<span class="net toc-title">IN THIS NOTE</span>
-					<nav>
-						<ol>
-							{toc.map((heading, i) => (
-								<li class:list={[{ sub: heading.depth === 3 }]}>
-									<a href={`#${heading.slug}`}>
-										<span>{String(i + 1).padStart(2, '0')}</span>{heading.text}
-									</a>
-								</li>
-							))}
-						</ol>
-					</nav>
-					<div class="toc-foot net"><i class="dot"></i> KFORCODE / FIELD NOTES</div>
+					<span class="net">on_this_page</span>
+					<ol>{toc.map((heading) => <li class:list={[{ sub: heading.depth === 3 }]}><a href={`#${heading.slug}`}>{heading.text}</a></li>)}</ol>
 				</aside>
 			)}
 		</main>
 
 		{(newer || older || related.length > 0) && (
 			<section class="more wrap">
-				<div class="more-head">
-					<span class="net">KEEP READING</span>
-					<span class="rule"></span>
+				<span class="net">continue_reading</span>
+				<div class="more-list">
+					{older && <a href={`/blog/${older.id}/`}><small>previous</small><strong>{older.data.title}</strong><span>←</span></a>}
+					{newer && <a href={`/blog/${newer.id}/`}><small>next</small><strong>{newer.data.title}</strong><span>→</span></a>}
+					{related.slice(0, 2).map((post) => <a href={`/blog/${post.id}/`}><small>related</small><strong>{post.data.title}</strong><span>→</span></a>)}
 				</div>
-
-				{(newer || older) && (
-					<div class="adjacent">
-						{older ? (
-							<a class="adj" href={`/blog/${older.id}/`}>
-								<span class="net">← PREVIOUS NOTE</span>
-								<strong>{older.data.title}</strong>
-							</a>
-						) : <span />}
-						{newer && (
-							<a class="adj adj-next" href={`/blog/${newer.id}/`}>
-								<span class="net">NEXT NOTE →</span>
-								<strong>{newer.data.title}</strong>
-							</a>
-						)}
-					</div>
-				)}
-
-				{related.length > 0 && (
-					<div class="related">
-						{related.map((post, i) => (
-							<a class="related-note node" href={`/blog/${post.id}/`}>
-								<span class="net">RELATED / {String(i + 1).padStart(2, '0')}</span>
-								<strong>{post.data.title}</strong>
-								<span>Read note ↗</span>
-							</a>
-						))}
-					</div>
-				)}
 			</section>
 		)}
-
 		<Footer />
 
 		<script is:inline>
@@ -169,15 +79,13 @@ const toc = headings.filter((heading) => heading.depth === 2 || heading.depth ==
 					anchor.setAttribute('aria-label', 'Link to this section');
 					heading.appendChild(anchor);
 				});
-
 				var progress = document.querySelector('.reading-progress span');
-				function updateProgress() {
-					var height = document.documentElement.scrollHeight - window.innerHeight;
-					var value = height > 0 ? Math.min(100, (window.scrollY / height) * 100) : 0;
-					if (progress) progress.style.width = value + '%';
+				function update() {
+					var height = document.documentElement.scrollHeight - innerHeight;
+					if (progress) progress.style.width = (height > 0 ? Math.min(100, scrollY / height * 100) : 0) + '%';
 				}
-				updateProgress();
-				window.addEventListener('scroll', updateProgress, { passive: true });
+				update();
+				addEventListener('scroll', update, { passive: true });
 			})();
 		</script>
 	</body>
@@ -190,7 +98,7 @@ const toc = headings.filter((heading) => heading.depth === 2 || heading.depth ==
 		top: 0;
 		left: 0;
 		right: 0;
-		height: 3px;
+		height: 2px;
 	}
 
 	.reading-progress span {
@@ -200,13 +108,12 @@ const toc = headings.filter((heading) => heading.depth === 2 || heading.depth ==
 		background: var(--accent);
 	}
 
-	.article-shell {
+	.article-layout {
 		display: grid;
-		grid-template-columns: minmax(0, 48rem) 15rem;
+		grid-template-columns: minmax(0, 45rem) 13rem;
 		justify-content: center;
-		gap: clamp(3rem, 7vw, 7rem);
+		gap: 5rem;
 		align-items: start;
-		padding-top: 3.5rem;
 	}
 
 	article {
@@ -214,6 +121,8 @@ const toc = headings.filter((heading) => heading.depth === 2 || heading.depth ==
 	}
 
 	.back {
+		display: inline-block;
+		margin-bottom: 2.5rem;
 		color: var(--muted);
 		text-decoration: none;
 	}
@@ -222,278 +131,164 @@ const toc = headings.filter((heading) => heading.depth === 2 || heading.depth ==
 		color: var(--accent);
 	}
 
-	.title-block {
-		margin: 2.5rem 0 2rem;
+	.prompt {
+		margin-bottom: 1rem;
+		text-transform: none;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
-	.title-block h1 {
-		margin: 1rem 0 1.25rem;
-		font-size: clamp(3.2rem, 2rem + 4vw, 5.8rem);
-		line-height: 0.95;
-		text-wrap: balance;
+	.prompt span {
+		color: var(--accent);
 	}
 
-	.article-dek {
-		max-width: 44rem;
-		margin: 0;
+	.article-head h1 {
+		font-size: clamp(2.5rem, 5vw, 4.3rem);
+		line-height: 1.06;
+	}
+
+	.description {
+		margin: 1.25rem 0 0;
 		color: var(--ink-soft);
-		font-family: var(--font-editorial);
-		font-size: clamp(1.2rem, 1rem + 0.55vw, 1.42rem);
-		line-height: 1.53;
+		font-size: 1.1rem;
+		line-height: 1.65;
 	}
 
-	.byline {
-		display: grid;
-		grid-template-columns: 42px minmax(0, 1fr) auto;
-		gap: 0.8rem;
-		align-items: center;
-		padding: 1rem 0;
-		border-top: 2px solid var(--ink);
-		border-bottom: var(--edge) solid var(--line-strong);
-	}
-
-	.author-mark {
-		display: grid;
-		place-items: center;
-		width: 38px;
-		height: 38px;
-		color: #fff7ec;
-		background: var(--accent);
-		font-family: var(--font-display);
-		font-weight: 800;
-	}
-
-	.byline-author {
+	.meta,
+	.tags {
 		display: flex;
-		flex-direction: column;
-		line-height: 1.25;
+		gap: 0.45rem 1rem;
+		flex-wrap: wrap;
 	}
 
-	.byline-author strong {
-		font-family: var(--font-display);
-		font-size: 0.82rem;
-	}
-
-	.byline-author span {
+	.meta {
+		margin-top: 1.4rem;
+		padding-top: 1rem;
+		border-top: 1px solid var(--line);
 		color: var(--muted);
-		font-size: 0.72rem;
-	}
-
-	.byline-meta {
-		display: flex;
-		gap: 0.8rem;
-		flex-wrap: wrap;
-		justify-content: flex-end;
-	}
-
-	.article-tags {
-		display: flex;
-		gap: 0.4rem;
-		flex-wrap: wrap;
-		padding: 1rem 0 3.5rem;
-	}
-
-	.article-end {
-		display: grid;
-		grid-template-columns: 95px 1fr;
-		gap: 2rem;
-		margin-top: 4rem;
-		padding: 2rem;
-		border-top: 5px solid var(--signal);
-		background: var(--bg-inset);
-	}
-
-	.end-mark {
-		color: var(--accent);
-		font-family: var(--font-display);
-		font-size: 4rem;
-		font-weight: 800;
-		line-height: 1;
-		letter-spacing: -0.1em;
-	}
-
-	.article-end h2 {
-		margin: 0.6rem 0;
-		font-size: 1.55rem;
-	}
-
-	.article-end p {
-		max-width: 520px;
-		color: var(--muted);
-		font-family: var(--font-editorial);
-		font-size: 1rem;
-		line-height: 1.5;
-	}
-
-	.end-links {
-		display: flex;
-		gap: 1.1rem;
-		flex-wrap: wrap;
-	}
-
-	.end-links a {
-		color: var(--ink);
 		font-family: var(--font-mono);
-		font-size: 0.68rem;
-		font-weight: 650;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
+		font-size: 0.64rem;
 	}
 
-	.end-links a:hover {
-		color: var(--accent);
+	.meta span:first-child {
+		color: var(--ink-soft);
+	}
+
+	.tags {
+		margin: 0.9rem 0 3rem;
+	}
+
+	.author-note {
+		margin-top: 4rem;
+		padding: 1.4rem;
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		background: var(--bg-panel);
+	}
+
+	.author-note p {
+		margin: 0.5rem 0;
+		color: var(--muted);
+		font-size: 0.84rem;
+	}
+
+	.author-note div {
+		display: flex;
+		gap: 1rem;
+	}
+
+	.author-note a {
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
 	}
 
 	.toc {
 		position: sticky;
-		top: 8rem;
-		align-self: start;
+		top: 6rem;
+		padding-left: 1rem;
+		border-left: 1px solid var(--line);
 	}
 
-	.toc-rule {
-		width: 100%;
-		height: 5px;
-		margin-bottom: 1rem;
-		background: var(--signal);
-	}
-
-	.toc-title {
-		display: block;
-		margin-bottom: 1rem;
-		color: var(--ink);
+	.toc > .net {
+		color: var(--ink-soft);
 	}
 
 	.toc ol {
 		list-style: none;
-		margin: 0;
+		margin: 0.9rem 0 0;
 		padding: 0;
-		border-top: var(--edge) solid var(--line);
 	}
 
 	.toc li {
-		border-bottom: var(--edge) solid var(--line);
+		margin-bottom: 0.65rem;
 	}
 
 	.toc li.sub {
-		padding-left: 0.65rem;
+		padding-left: 0.75rem;
 	}
 
 	.toc a {
-		display: grid;
-		grid-template-columns: 24px 1fr;
-		gap: 0.35rem;
-		padding: 0.55rem 0;
 		color: var(--muted);
 		font-size: 0.72rem;
 		line-height: 1.35;
 		text-decoration: none;
 	}
 
-	.toc a span {
-		color: var(--accent);
-		font-family: var(--font-mono);
-		font-size: 0.55rem;
-	}
-
 	.toc a:hover {
-		color: var(--ink);
-	}
-
-	.toc-foot {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-top: 1.2rem;
-		font-size: 0.54rem;
+		color: var(--accent);
 	}
 
 	.more {
-		margin-top: 5rem;
+		margin-top: 4rem;
 	}
 
-	.more-head {
+	.more > .net {
+		color: var(--ink-soft);
+	}
+
+	.more-list {
 		display: grid;
-		grid-template-columns: auto 1fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 1rem;
-		align-items: center;
-		margin-bottom: 1.5rem;
+		margin-top: 1rem;
 	}
 
-	.more-head .rule {
-		height: 1px;
-		background: var(--line-strong);
-	}
-
-	.adjacent,
-	.related {
+	.more-list a {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-	}
-
-	.adjacent {
-		margin-bottom: 1rem;
-	}
-
-	.adj {
-		display: flex;
-		flex-direction: column;
-		gap: 0.55rem;
-		padding: 1.2rem 0;
-		border-top: 2px solid var(--ink);
-		border-bottom: var(--edge) solid var(--line-strong);
+		grid-template-columns: 1fr auto;
+		gap: 0.35rem 1rem;
+		padding: 1.1rem;
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
 		color: var(--ink);
 		text-decoration: none;
 	}
 
-	.adj-next {
-		align-items: flex-end;
-		text-align: right;
+	.more-list a:hover {
+		border-color: var(--line-strong);
 	}
 
-	.adj strong {
-		max-width: 480px;
-		font-family: var(--font-display);
-		font-size: 1.02rem;
-		line-height: 1.35;
-	}
-
-	.adj:hover strong {
+	.more-list small {
+		grid-column: 1 / -1;
 		color: var(--accent);
-	}
-
-	.related-note {
-		display: flex;
-		flex-direction: column;
-		gap: 0.65rem;
-		min-height: 170px;
-		padding: 1.3rem;
-		color: var(--ink);
-		text-decoration: none;
-	}
-
-	.related-note .net,
-	.related-note > span:last-child {
-		color: var(--accent);
-	}
-
-	.related-note strong {
-		font-family: var(--font-display);
-		font-size: 1.05rem;
-		line-height: 1.3;
-	}
-
-	.related-note > span:last-child {
-		margin-top: auto;
 		font-family: var(--font-mono);
-		font-size: 0.65rem;
-		font-weight: 650;
-		text-transform: uppercase;
+		font-size: 0.6rem;
 	}
 
-	@media (max-width: 980px) {
-		.article-shell {
-			grid-template-columns: minmax(0, 48rem);
+	.more-list strong {
+		font-size: 0.86rem;
+		line-height: 1.4;
+	}
+
+	.more-list span {
+		color: var(--muted);
+		font-family: var(--font-mono);
+	}
+
+	@media (max-width: 940px) {
+		.article-layout {
+			grid-template-columns: minmax(0, 45rem);
 		}
 
 		.toc {
@@ -501,37 +296,13 @@ const toc = headings.filter((heading) => heading.depth === 2 || heading.depth ==
 		}
 	}
 
-	@media (max-width: 640px) {
-		.article-shell {
-			padding-top: 2.5rem;
+	@media (max-width: 650px) {
+		.article-layout {
+			padding-top: 2rem;
 		}
 
-		.byline {
-			grid-template-columns: 42px 1fr;
-		}
-
-		.byline-meta {
-			grid-column: 1 / -1;
-			justify-content: flex-start;
-		}
-
-		.article-end {
+		.more-list {
 			grid-template-columns: 1fr;
-			padding: 1.5rem;
-		}
-
-		.end-mark {
-			font-size: 2.8rem;
-		}
-
-		.adjacent,
-		.related {
-			grid-template-columns: 1fr;
-		}
-
-		.adj-next {
-			align-items: flex-start;
-			text-align: left;
 		}
 	}
 </style>

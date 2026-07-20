@@ -1,6 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="K slash C monogram">
-  <rect width="128" height="128" rx="14" fill="#171611"/>
-  <path d="M29 25v78M29 67l30-40M29 65l31 38" fill="none" stroke="#f4efe5" stroke-width="12" stroke-linejoin="bevel"/>
-  <path d="M73 105 93 23" fill="none" stroke="#ff6943" stroke-width="8"/>
-  <path d="M111 37c-5-7-12-11-21-11-17 0-29 15-29 38s12 38 29 38c9 0 16-4 21-11" fill="none" stroke="#f4efe5" stroke-width="9" stroke-linecap="square"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Terminal prompt">
+  <rect width="128" height="128" rx="18" fill="#0b0b0b"/>
+  <path d="m31 35 29 29-29 29" fill="none" stroke="#4ade80" stroke-width="12" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M66 94h33" fill="none" stroke="#f1f1f1" stroke-width="12" stroke-linecap="square"/>
 </svg>
