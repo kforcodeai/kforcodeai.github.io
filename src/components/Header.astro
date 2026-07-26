@@ -128,9 +128,23 @@ import ThemeToggle from './ThemeToggle.astro';
 		}
 	}
 
-	@media (max-width: 460px) {
-		.brand small {
-			display: none;
+	/* Two-row header once brand + 4 links + toggle no longer fit on one line. */
+	@media (max-width: 470px) {
+		nav {
+			flex-wrap: wrap;
+			height: auto;
+			padding: 0.55rem 0 0.15rem;
+		}
+
+		.links {
+			order: 3;
+			flex-basis: 100%;
+			margin-left: -0.38rem;
+		}
+
+		.actions {
+			border-left: 0;
+			padding-left: 0;
 		}
 	}
 </style>
