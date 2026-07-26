@@ -218,11 +218,6 @@ hr {
 	transition: border-color 0.16s var(--ease), background-color 0.16s var(--ease);
 }
 
-.node::before,
-.node::after {
-	display: none;
-}
-
 a.node,
 .node--link {
 	display: block;
@@ -247,7 +242,7 @@ a.node:hover,
 	color: var(--muted);
 	background: transparent;
 	font-family: var(--font-mono);
-	font-size: 0.67rem;
+	font-size: 0.7rem;
 	line-height: 1.35;
 	text-decoration: none;
 	white-space: nowrap;

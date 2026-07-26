@@ -5,6 +5,7 @@ import ThemeToggle from './ThemeToggle.astro';
 ---
 
 <header class="site-header">
+	<a class="skip-link" href="#main">skip to content</a>
 	<nav class="wrap" aria-label="Primary navigation">
 		<a href="/" class="brand" aria-label="kforcode.dev — home">
 			<span aria-hidden="true">~/</span>kforcode<small>.dev</small>
@@ -25,6 +26,26 @@ import ThemeToggle from './ThemeToggle.astro';
 </header>
 
 <style>
+	.skip-link {
+		position: absolute;
+		top: 0.7rem;
+		left: 0.7rem;
+		z-index: 100;
+		padding: 0.6rem 0.9rem;
+		border: 1px solid var(--accent);
+		border-radius: var(--radius);
+		color: var(--ink);
+		background: var(--bg-panel);
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-decoration: none;
+		transform: translateY(-300%);
+	}
+
+	.skip-link:focus {
+		transform: translateY(0);
+	}
+
 	.site-header {
 		position: sticky;
 		top: 0;

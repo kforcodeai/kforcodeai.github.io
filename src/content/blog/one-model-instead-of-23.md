@@ -2,7 +2,6 @@
 title: 'One model instead of 23: consolidating a Document AI stack'
 description: 'A model per document type does not scale. Here is how a single layout-aware extraction architecture replaced 23+ document-specific models, cut OCR spend 70%, and made new document types cheap to add.'
 pubDate: '2026-07-07'
-heroImage: '../../assets/blog-placeholder-3.jpg'
 tags: ['document-ai', 'ocr', 'ml-systems', 'cost', 'architecture']
 ---
 

@@ -2,7 +2,6 @@
 title: 'From 86% to 97%: engineering evidence retrieval for compliance agents'
 description: 'Compliance answers are only trustworthy if every claim cites the right evidence. Here is how hybrid retrieval, reranking, control-aware chunking, and citation-span ranking took evidence F1@10 from 86% to 97%.'
 pubDate: '2026-07-14'
-heroImage: '../../assets/blog-placeholder-2.jpg'
 tags: ['rag', 'retrieval', 'evals', 'compliance', 'llm']
 ---
 

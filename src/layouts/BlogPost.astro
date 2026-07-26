@@ -27,7 +27,7 @@ const toc = headings.filter((heading) => heading.depth === 2 || heading.depth ==
 	<body>
 		<div class="reading-progress" aria-hidden="true"><span></span></div>
 		<Header />
-		<main class="article-layout">
+		<main id="main" class="article-layout">
 			<article>
 				<header class="article-head">
 					<a class="net back" href="/blog">← writing</a>
@@ -168,7 +168,7 @@ const toc = headings.filter((heading) => heading.depth === 2 || heading.depth ==
 		border-top: 1px solid var(--line);
 		color: var(--muted);
 		font-family: var(--font-mono);
-		font-size: 0.64rem;
+		font-size: 0.68rem;
 	}
 
 	.meta span:first-child {
@@ -200,7 +200,7 @@ const toc = headings.filter((heading) => heading.depth === 2 || heading.depth ==
 
 	.author-note a {
 		font-family: var(--font-mono);
-		font-size: 0.66rem;
+		font-size: 0.7rem;
 	}
 
 	.toc {
@@ -273,7 +273,7 @@ const toc = headings.filter((heading) => heading.depth === 2 || heading.depth ==
 		grid-column: 1 / -1;
 		color: var(--accent);
 		font-family: var(--font-mono);
-		font-size: 0.6rem;
+		font-size: 0.68rem;
 	}
 
 	.more-list strong {

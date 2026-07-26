@@ -2,7 +2,6 @@
 title: 'The system layer behind AI products: what an agent runtime actually does'
 description: 'AI demos are easy; AI products are hard. The gap is a runtime — the shared execution layer that handles model routing, tool authorization, long-context state, memory, and fallback. Here is what it takes to run one at scale.'
 pubDate: '2026-07-20'
-heroImage: '../../assets/blog-placeholder-1.jpg'
 tags: ['agents', 'ai-platform', 'runtime', 'llm', 'production']
 ---
 

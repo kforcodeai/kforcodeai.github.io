@@ -14,7 +14,7 @@ const postPages = Object.fromEntries(
 
 const sitePages: Record<string, { title: string; description: string }> = {
 	home: {
-		title: 'Engineering AI systems that survive production.',
+		title: 'Engineering AI systems built for production.',
 		description: `${SITE_TITLE} · Field notes on production AI, agentic systems, deep-learning papers, and software engineering.`,
 	},
 	writing: {
@@ -30,7 +30,7 @@ const sitePages: Record<string, { title: string; description: string }> = {
 		description: `${AUTHOR.name} · ${AUTHOR.role} · 8+ years shipping production AI at scale.`,
 	},
 	consulting: {
-		title: 'Ship AI that survives production.',
+		title: 'Ship production-grade AI.',
 		description: `Consulting with ${AUTHOR.name} · agent platforms, retrieval & RAG quality, evals, LLM cost engineering.`,
 	},
 };

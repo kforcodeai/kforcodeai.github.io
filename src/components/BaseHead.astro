@@ -2,15 +2,12 @@
 // Import the global.css file here so that it is included on
 // all pages through the use of the <BaseHead /> component.
 import '../styles/global.css';
-import type { ImageMetadata } from 'astro';
-import FallbackImage from '../assets/blog-placeholder-1.jpg';
 import { AUTHOR, PAPERS, SITE_DESCRIPTION, SITE_KEYWORDS, SITE_TITLE } from '../consts';
 import { Font } from 'astro:assets';
 
 interface Props {
 	title: string;
 	description?: string;
-	image?: ImageMetadata;
 	ogImage?: string; // absolute-from-root path to a generated OG card, e.g. /og/my-post.png
 	type?: 'website' | 'article';
 	pubDate?: Date;
@@ -23,7 +20,6 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const {
 	title,
 	description = SITE_DESCRIPTION,
-	image = FallbackImage,
 	ogImage,
 	type = 'website',
 	pubDate,
@@ -31,9 +27,8 @@ const {
 	tags = [],
 } = Astro.props;
 
-const socialImage = ogImage
-	? new URL(ogImage, Astro.site)
-	: new URL(image.src, Astro.url);
+// Every page should pass a generated OG card; the branded home card is the fallback.
+const socialImage = new URL(ogImage ?? '/og/home.png', Astro.site);
 
 // Breadcrumb trail from the URL path: Home › Segment › …
 const segments = Astro.url.pathname.split('/').filter(Boolean);

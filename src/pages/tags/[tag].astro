@@ -27,7 +27,7 @@ const blurb = topic?.blurb ?? `Production AI engineering notes tagged “${tag}�
 	<head><BaseHead title={`${label} articles · ${SITE_TITLE}`} description={`${blurb} Browse ${posts.length} article${posts.length === 1 ? '' : 's'} in this topic.`} /></head>
 	<body>
 		<Header />
-		<main>
+		<main id="main">
 			<header class="page-head">
 				<a href="/blog" class="net back">← writing</a>
 				<div class="prompt net"><span>~/writing</span>$ rg "{tag}"</div>

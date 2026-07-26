@@ -48,10 +48,10 @@ const writingLd = {
 	</head>
 	<body>
 		<Header />
-		<main>
+		<main id="main">
 			<section class="hero">
 				<div class="prompt net"><span>kaushal@kforcode</span>:~$ whoami</div>
-				<h1>Engineering AI systems that survive production.</h1>
+				<h1>Engineering AI systems built for production.</h1>
 				<p class="lede">
 					I’m Kaushal, a Staff AI/ML Engineer. I build agent runtimes, evaluation systems,
 					retrieval infrastructure, and developer platforms—and write about what actually works.
@@ -66,6 +66,71 @@ const writingLd = {
 					<a class="btn ghost" href="/consulting">work with me</a>
 					<a class="btn ghost" href="/about">about me</a>
 				</div>
+			</section>
+
+			<section class="fig">
+				<SectionHead net="FIG.01 · the_system_layer" />
+				<figure>
+					<div class="fig-scroll">
+						<svg
+							viewBox="0 0 920 252"
+							role="img"
+							aria-label="Architecture diagram: six product surfaces connect to one unified AI runtime handling model routing, tool authorization, memory, and provider fallback, gated by evals — which connects out to model providers and 600+ tool operations over MCP."
+						>
+							<defs>
+								<marker id="fig-arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+									<path class="s-arr" d="M0 0L8 4L0 8z"></path>
+								</marker>
+							</defs>
+
+							<text class="s-g" x="8" y="14">surfaces · 6+</text>
+							<rect class="s-box" x="8" y="26" width="168" height="34" rx="5"></rect>
+							<text class="s-t" x="24" y="47.5">voice_ai</text>
+							<rect class="s-box" x="8" y="70" width="168" height="34" rx="5"></rect>
+							<text class="s-t" x="24" y="91.5">conversation_ai</text>
+							<rect class="s-box" x="8" y="114" width="168" height="34" rx="5"></rect>
+							<text class="s-t" x="24" y="135.5">agent_studio</text>
+							<rect class="s-box" x="8" y="158" width="168" height="34" rx="5"></rect>
+							<text class="s-t" x="24" y="179.5">ask_ai</text>
+							<text class="s-sub" x="8" y="214">+ ads_copilot · email_agent</text>
+
+							<path class="s-edge" marker-end="url(#fig-arr)" d="M176 43 C226 43 228 60 278 60"></path>
+							<path class="s-edge" marker-end="url(#fig-arr)" d="M176 87 C226 87 228 88 278 88"></path>
+							<path class="s-edge" marker-end="url(#fig-arr)" d="M176 131 C226 131 228 116 278 116"></path>
+							<path class="s-edge" marker-end="url(#fig-arr)" d="M176 175 C226 175 228 144 278 144"></path>
+
+							<text class="s-g" x="280" y="14">execution layer</text>
+							<rect class="s-box s-box--accent" x="280" y="26" width="280" height="150" rx="6"></rect>
+							<text class="s-title" x="420" y="54" text-anchor="middle">unified_ai_runtime</text>
+							<line class="s-div" x1="296" y1="68" x2="544" y2="68"></line>
+							<text class="s-sub" x="300" y="94">model_routing</text>
+							<text class="s-sub" x="424" y="94">tool_authz</text>
+							<text class="s-sub" x="300" y="118">memory</text>
+							<text class="s-sub" x="424" y="118">provider_fallback</text>
+							<circle class="s-dot" cx="305" cy="148" r="3.5"></circle>
+							<text class="s-live" x="316" y="152">live · 99.9% success</text>
+
+							<path class="s-edge s-dash" marker-end="url(#fig-arr)" d="M420 176 L420 206"></path>
+							<rect class="s-box" x="330" y="206" width="180" height="34" rx="5"></rect>
+							<text class="s-t" x="420" y="227.5" text-anchor="middle">evals · release_gates</text>
+
+							<path class="s-edge" marker-end="url(#fig-arr)" d="M560 54 L674 54"></path>
+							<path class="s-edge" marker-end="url(#fig-arr)" d="M560 148 L674 148"></path>
+
+							<text class="s-g" x="676" y="14">capabilities</text>
+							<rect class="s-box" x="676" y="26" width="236" height="56" rx="5"></rect>
+							<text class="s-t" x="692" y="48">model_providers</text>
+							<text class="s-sub" x="692" y="68">openai · anthropic · google</text>
+							<rect class="s-box" x="676" y="120" width="236" height="56" rx="5"></rect>
+							<text class="s-t" x="692" y="142">tools_over_mcp</text>
+							<text class="s-sub" x="692" y="162">600+ operations</text>
+						</svg>
+					</div>
+					<figcaption class="net">
+						FIG.01 — the layer I build: one runtime between product surfaces and models — routing,
+						tool authorization, memory, and evals in a single system.
+					</figcaption>
+				</figure>
 			</section>
 
 			<section class="writing">
@@ -188,7 +253,7 @@ const writingLd = {
 		margin-top: 1.5rem;
 		color: var(--muted);
 		font-family: var(--font-mono);
-		font-size: 0.66rem;
+		font-size: 0.7rem;
 	}
 
 	.status-line span {
@@ -202,6 +267,94 @@ const writingLd = {
 		gap: 0.65rem;
 		flex-wrap: wrap;
 		margin-top: 2rem;
+	}
+
+	.fig figure {
+		margin: 0;
+	}
+
+	.fig-scroll {
+		padding: 1.75rem 1.5rem;
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		background: var(--bg-panel);
+		overflow-x: auto;
+	}
+
+	.fig-scroll svg {
+		display: block;
+		min-width: 780px;
+		width: 100%;
+		height: auto;
+	}
+
+	.fig svg text {
+		font-family: var(--font-mono);
+	}
+
+	.s-g {
+		font-size: 10px;
+		letter-spacing: 0.09em;
+		text-transform: uppercase;
+		fill: var(--muted);
+	}
+
+	.s-t {
+		font-size: 11px;
+		fill: var(--ink);
+	}
+
+	.s-title {
+		font-size: 12px;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		fill: var(--ink);
+	}
+
+	.s-sub {
+		font-size: 10px;
+		fill: var(--muted);
+	}
+
+	.s-live {
+		font-size: 10px;
+		fill: var(--accent);
+	}
+
+	.s-box {
+		fill: var(--bg-inset);
+		stroke: var(--line-strong);
+	}
+
+	.s-box--accent {
+		stroke: var(--accent);
+	}
+
+	.s-dot {
+		fill: var(--live);
+	}
+
+	.s-div {
+		stroke: var(--line);
+	}
+
+	.s-edge {
+		fill: none;
+		stroke: var(--line-strong);
+	}
+
+	.s-dash {
+		stroke-dasharray: 4 4;
+	}
+
+	.s-arr {
+		fill: var(--line-strong);
+	}
+
+	.fig figcaption {
+		max-width: 760px;
+		margin-top: 0.85rem;
+		text-transform: none;
 	}
 
 	.work-grid,
