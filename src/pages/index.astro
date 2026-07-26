@@ -63,6 +63,7 @@ const writingLd = {
 				</div>
 				<div class="hero-actions">
 					<a class="btn" href="/blog">read the writing →</a>
+					<a class="btn ghost" href="/consulting">work with me</a>
 					<a class="btn ghost" href="/about">about me</a>
 				</div>
 			</section>
@@ -114,15 +115,32 @@ const writingLd = {
 				</div>
 			</section>
 
-			<section class="contact">
-				<div>
-					<span class="net">open_channel</span>
-					<h2>Building the hard part of AI?</h2>
-					<p>I’m always open to thoughtful conversations about AI platforms, agent infrastructure, and Staff/Principal engineering work.</p>
+			<section class="paths" aria-label="Work with me">
+				<SectionHead net="open_channel" />
+				<div class="path-grid">
+					<a class="path node" href="/consulting/">
+						<span class="net">FOR::TEAMS</span>
+						<h2>Building AI products?</h2>
+						<p>
+							I consult on agent platforms, retrieval quality, evals, and LLM cost —
+							advisory sessions, architecture reviews, and ongoing engagements.
+						</p>
+						<i class="net">work with me →</i>
+					</a>
+					<a class="path node" href="/about/">
+						<span class="net">FOR::RECRUITERS</span>
+						<h2>Hiring Staff+ AI engineers?</h2>
+						<p>
+							Eight years of production AI across four companies, three peer-reviewed
+							papers, and the platform behind six AI product surfaces.
+						</p>
+						<i class="net">see the track record →</i>
+					</a>
 				</div>
-				<div class="contact-links">
-					<a class="btn" href={AUTHOR.linkedin} target="_blank" rel="me noopener">linkedin ↗</a>
-					<a class="btn ghost" href={`mailto:${AUTHOR.email}`}>email</a>
+				<div class="path-links">
+					<a class="btn" href={`mailto:${AUTHOR.email}`}>email</a>
+					<a class="btn ghost" href={AUTHOR.calendly} target="_blank" rel="noopener">book a call ↗</a>
+					<a class="btn ghost" href={AUTHOR.linkedin} target="_blank" rel="me noopener">linkedin ↗</a>
 				</div>
 			</section>
 		</main>
@@ -179,8 +197,7 @@ const writingLd = {
 		gap: 0.5rem;
 	}
 
-	.hero-actions,
-	.contact-links {
+	.hero-actions {
 		display: flex;
 		gap: 0.65rem;
 		flex-wrap: wrap;
@@ -303,32 +320,45 @@ const writingLd = {
 		font-size: 0.68rem;
 	}
 
-	.contact {
+	.path-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 1rem;
+	}
+
+	.path {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 3rem;
-		padding: 2rem;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		background: var(--bg-panel);
+		flex-direction: column;
+		gap: 0.6rem;
+		padding: 1.75rem;
 	}
 
-	.contact h2 {
-		margin-top: 0.55rem;
-		font-size: 1.7rem;
+	.path h2 {
+		font-size: 1.45rem;
 	}
 
-	.contact p {
-		max-width: 650px;
-		margin: 0.65rem 0 0;
+	.path p {
+		margin: 0;
 		color: var(--muted);
-		font-size: 0.86rem;
+		font-size: 0.88rem;
+		flex: 1;
 	}
 
-	.contact-links {
-		flex: none;
-		margin-top: 0;
+	.path > i {
+		font-style: normal;
+		transition: color 0.15s var(--ease);
+	}
+
+	.path:hover h2,
+	.path:hover > i {
+		color: var(--accent);
+	}
+
+	.path-links {
+		display: flex;
+		gap: 0.65rem;
+		flex-wrap: wrap;
+		margin-top: 1rem;
 	}
 
 	@media (max-width: 760px) {
@@ -362,9 +392,8 @@ const writingLd = {
 			border-bottom: 1px solid var(--line);
 		}
 
-		.contact {
-			align-items: flex-start;
-			flex-direction: column;
+		.path-grid {
+			grid-template-columns: 1fr;
 		}
 	}
 

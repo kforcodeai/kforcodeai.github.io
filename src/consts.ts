@@ -12,6 +12,8 @@ export const AUTHOR = {
 	email: 'kaushalcse07@gmail.com',
 	github: 'https://github.com/kforcodeai',
 	linkedin: 'https://www.linkedin.com/in/kforcode/',
+	calendly: 'https://calendly.com/kforcode',
+	resume: '/Kaushal-Prajapati-Resume.pdf',
 	twitter: '', // add if/when you create one, e.g. https://x.com/kforcode
 	site: 'https://kforcode.dev',
 };
@@ -56,6 +58,13 @@ export const SITE_KEYWORDS = [
 	'geospatial machine learning',
 	'property risk modeling',
 	'PII detection',
+	'AI consultant',
+	'AI consulting',
+	'LLM consultant',
+	'RAG consulting',
+	'AI architecture review',
+	'AI advisory',
+	'fractional AI engineer',
 	'Kaushal Prajapati',
 	'kforcode',
 ];

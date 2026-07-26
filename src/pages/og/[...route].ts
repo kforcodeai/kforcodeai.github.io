@@ -29,6 +29,10 @@ const sitePages: Record<string, { title: string; description: string }> = {
 		title: 'I build the system layer between models and products.',
 		description: `${AUTHOR.name} · ${AUTHOR.role} · 8+ years shipping production AI at scale.`,
 	},
+	consulting: {
+		title: 'Ship AI that survives production.',
+		description: `Consulting with ${AUTHOR.name} · agent platforms, retrieval & RAG quality, evals, LLM cost engineering.`,
+	},
 };
 
 const pages = { ...sitePages, ...postPages };

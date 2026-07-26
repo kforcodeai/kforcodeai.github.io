@@ -160,6 +160,18 @@ const articleLd = pubDate && {
 <meta name="twitter:image" content={socialImage} />
 <meta name="twitter:image:alt" content={`${title} — ${SITE_TITLE}`} />
 
+<!-- Analytics: GoatCounter — cookieless, GDPR-friendly, production only -->
+{
+	import.meta.env.PROD && (
+		<script
+			is:inline
+			data-goatcounter="https://kforcode.goatcounter.com/count"
+			async
+			src="https://gc.zgo.at/count.js"
+		/>
+	)
+}
+
 <!-- Structured data -->
 <script type="application/ld+json" set:html={JSON.stringify(personLd)} />
 <script type="application/ld+json" set:html={JSON.stringify(breadcrumbLd)} />

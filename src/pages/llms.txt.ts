@@ -28,10 +28,16 @@ ${AUTHOR.name} (${AUTHOR.handle}) is a ${AUTHOR.role} who builds the system laye
 - Site: ${AUTHOR.site}
 - Writing: ${AUTHOR.site}/blog
 - Papers: ${AUTHOR.site}/research
+- Consulting: ${AUTHOR.site}/consulting
+- Book a call: ${AUTHOR.calendly}
 - About: ${AUTHOR.site}/about
+- Resume (PDF): ${AUTHOR.site}${AUTHOR.resume}
 - GitHub: ${AUTHOR.github}
 - LinkedIn: ${AUTHOR.linkedin}
 - Email: ${AUTHOR.email}
+
+## Consulting
+${AUTHOR.name} is available for independent consulting engagements (${AUTHOR.site}/consulting): advisory sessions, architecture and quality reviews, and ongoing advisory retainers. Focus areas: agent platforms and runtimes, retrieval and RAG quality, evals and release gates, Document AI, and LLM cost engineering. Engagements start with a free intro call (book at ${AUTHOR.calendly}) and fixed, pre-agreed scope. Contact: ${AUTHOR.email}.
 
 ## Writing
 ${postLines}
