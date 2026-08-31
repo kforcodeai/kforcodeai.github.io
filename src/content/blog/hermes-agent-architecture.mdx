@@ -31,23 +31,21 @@ drills:
 import Figure from '../../components/Figure.astro';
 import Callout from '../../components/Callout.astro';
 
-In hermes-agent's config, the two cheapest ways to shrink a prompt both ship switched off, and the expensive one is the only thing left on. Everything interesting about the hermes-agent architecture follows from why.
+NousResearch's [hermes-agent](https://github.com/NousResearch/hermes-agent) is a personal AI assistant you talk to from a terminal, a desktop app, a code editor, or any of about twenty chat platforms. It is also the largest open-source agent harness I have read. The hermes-agent architecture is built around a single constraint, and the clearest place to see it is a config file, where the two settings that shrink a conversation once the context window fills up are both switched off.
 
-The cheap ones are deterministic: dedupe repeated tool results, truncate oversized arguments, protect the recent tail, never call a model. The expensive one calls an LLM to summarize your transcript and hopes the summary was faithful. Every context ladder I would have written before this repo puts the deterministic passes first and summarization last.
+Those two are the cheap ones. They walk back through old tool output, drop results that repeat, cut oversized arguments down, and never call a model to decide any of it. Nothing disappears that you cannot go back and read in full. The one left switched on is the expensive one: it hands your history to an LLM, asks for a summary, and then works from the summary, trusting that it kept what mattered.
 
-NousResearch shipped it the other way round, and the comment beside each switch gives the same reason.
+That is the reverse of the order I would have put them in, and of the advice I have given other people. Reduce cheaply and reversibly first; summarize last, if at all. The comment beside each switched-off setting gives the same one-line reason for both, and once you accept that reason the rest of the design follows from it.
 
 ## One conversation that never ends
 
-[hermes-agent](https://github.com/NousResearch/hermes-agent) is NousResearch's personal agent: one Python core behind a CLI, a terminal UI, a desktop app, editor integrations, cron, and a gateway that speaks about twenty chat platforms. Its compaction module alone is larger than most complete harnesses.
-
-The size is not the interesting part. The workload assumption is. You talk to it from your terminal in the morning, your phone at lunch, a cron job overnight, and the design assumes this is one conversation, hundreds of tool results deep.
+One Python core sits behind all of those surfaces, and its compaction module alone is larger than most complete harnesses. The size is not the interesting part. The workload assumption is. You talk to it from your terminal in the morning, your phone at lunch, a cron job overnight, and the design assumes this is one conversation, hundreds of tool results deep.
 
 That assumption changes the arithmetic. A short session either gets the prefix discount or misses it, and the amount is small either way. Run the same conversation for a hundred turns and the prefix becomes the line item you pay again on every one of them, cached or uncached. The governing question stops being "how few tokens can I send" and becomes "how do I avoid re-pricing what I have already sent". That is a runtime problem more than a modeling one, which is the [layer I usually end up writing about](/blog/the-system-layer-behind-ai-products).
 
 ## Six front doors, one narrow waist
 
-Six surfaces, one core, and a refusal to let any of them change what sits at the front of the prompt.
+That is why all six surfaces funnel through one core, and why the core will not let any of them change what sits at the front of the prompt.
 
 <Figure n="01" caption="Six surfaces share one core; the cache plan is applied to a copy; billed usage from the provider gates the reduction paths below.">
 
@@ -123,7 +121,11 @@ Six surfaces, one core, and a refusal to let any of them change what sits at the
 </svg>
 </Figure>
 
-The frozen pair is the system prompt and the tool schema, both at the front of the cached prefix. Two breakpoints sit there and two roll forward with the last two cacheable messages, so each turn buys one cache write on the bytes it just added and every later turn reads them back at a tenth of the price. The provider reports a billed prompt-token count, and that number is what the two token-triggered reduction paths fire on.
+Two things sit at the front of every request the harness sends: the system prompt, and the schema that describes every tool the model is allowed to call. On turn ninety they are identical to what they were on turn one, and that sameness is the whole point. A provider will only charge you the cheap rate for work it has already done if the bytes match exactly, starting from the very first byte of the request. Change one character near the front and everything behind it has to be paid for again.
+
+A cache breakpoint is how you tell the provider where to save its work, and you get four of them per request. Hermes spends two on that unchanging front section, and lets the other two ride at the end of the conversation, moving forward as it grows. So each turn pays once to save the few messages it just added, and every turn after that reads them back for roughly a tenth of what sending them fresh would cost. The whole plan is applied to a copy, which is why the conversation stored on disk stays a plain transcript with no cache markings in it.
+
+One number comes back with the response: how many prompt tokens the provider actually billed. That number, rather than the harness's own guess, is what the reduction paths along the bottom of the diagram fire on.
 
 ## The constraint they wrote down
 
@@ -135,9 +137,9 @@ That refusal is not an implementation detail that happened to settle. Their deve
 
 </Callout>
 
-Their own pricing table supplies the numbers. One current model lists input at $5.00 per million tokens, cache reads at $0.50, cache writes at $6.25. I read this code rather than running it, so treat the rest as arithmetic on their figures. A cached read costs a tenth of a fresh read, and a cache write a quarter more than not caching at all. So a prefix you write and never read back is a loss, and one you read back once has paid for itself. Cache-breaking is a penalty charged up front, plus full price to re-ingest everything behind the break.
+Their own pricing table puts numbers on it. One current model lists input at $5.00 per million tokens, cache reads at $0.50, and cache writes at $6.25 — so saving the work costs a quarter more than just sending the tokens uncached. I read this code rather than running it, so treat that as arithmetic on their figures. A prefix you save and never read back is a loss; one you read back once has already paid for itself. Breaking the cache is a penalty charged up front, plus full price to re-send everything behind the break.
 
-The rule reaches into the product, and where it stops is instructive. Any slash command that mutates system-prompt state is supposed to defer the invalidation to your next session, unless you ask for it now and accept the bill. Installing a skill does. Reloading MCP servers takes effect immediately, behind a modal titled as a prompt-cache invalidation warning.
+The rule reaches into the product. A slash command that changes the system prompt is supposed to wait until your next session rather than invalidate the cache now, and the one command that ignores that puts a prompt-cache invalidation warning on screen first.
 
 One limit on all of this gets skipped in most writing about prompt caching: a cached prefix has a lifetime, and the shipped default here is the five-minute tier, with an hour available on request. So the morning-terminal-to-lunch-phone story reuses nothing. The prefix is long cold and the first turn back pays a fresh write. The contract binds hard inside a burst of turns and not at all across the gaps between them, which is where the interesting opportunity turns out to live.
 
@@ -159,7 +161,7 @@ I went in expecting to file those zeros as an oversight, a half-built feature le
 | Prune off, carry the junk instead | Nothing. The junk rides along in history | Cached re-sends at a tenth of fresh input, and window: dead tokens pull the lossy summarization forward |
 | Micro-compaction on, every turn | On their published run, occupancy flattened at about a fifth of the threshold and batch compaction never fired at all | A broken prefix every turn, and a stall per pass of two to thirty-seven seconds, median around thirty-one, on one contended local model |
 
-Those columns are honest about money and vague about accuracy. Carrying junk is priced as cheap tokens, but stale tool output is not inert, and a superseded file listing is something the model can read and act on. Nothing in the repo measures that and neither can I from reading it, so treat row two's accuracy cost as unknown rather than zero. Neither pass is destructive on disk, since both archive the original rows and leave them searchable, so the accuracy question is only about what the model can still see.
+Those columns are honest about money and vague about accuracy. Carrying junk is cheap in tokens, but stale tool output is not inert: a superseded file listing is something the model can read and act on. Nothing in the repo measures that and neither can I, so treat row two's accuracy cost as unknown rather than zero. Neither pass destroys anything on disk, since both archive the original rows, so the question is only what the model can still see.
 
 ## Four thousand tokens, or it doesn't commit
 
@@ -269,29 +271,27 @@ The blind spot follows from the shape of it. The projection corrects bias it has
 
 That calibrated trigger tells you when to compact and says nothing about whether compacting helped. The second half of the loop is where this harness stops resembling the others.
 
-Effectiveness here means one thing: did the prompt get under the threshold, judged on the provider's billed count for the conversation just compacted. A shrinking message list does not count, and the reason is a floor compaction cannot touch. Compaction only shrinks messages, while the system prompt and tool schemas are incompressible. So when the floor alone meets the threshold, "every pass shrinks messages by a healthy margin yet leaves the prompt over the line, so the next turn compacts again, forever."
+Effectiveness means one thing here: did the prompt get under the threshold, judged on the provider's billed count for the conversation just compacted. A shrinking message list does not count, because of a floor compaction cannot touch. Compaction only shrinks messages, while the system prompt and tool schemas are incompressible. So when the floor alone meets the threshold, "every pass shrinks messages by a healthy margin yet leaves the prompt over the line, so the next turn compacts again, forever."
 
-A post-compaction reading still over the line records a strike. Two strikes trip a breaker, and after five minutes of block one probation probe is allowed, with the counter dropped to a single strike so a bad probe re-trips at once. Counters are durable per session, and the recovery clock arms on the first blocked evaluation rather than at trip time, so a process restarting into a tripped guard starts a full window blocked. Tripping buys an end to paying for passes that reclaim nothing. It leaves a session that can only grow toward the provider's hard limit. Read the breaker as a diagnosis rather than a repair: your floor is too big, and no schedule of summaries fixes a floor.
+A post-compaction reading still over the line records a strike. Two strikes trip a breaker, and after five minutes one probe is allowed, with the counter dropped to a single strike so a bad probe re-trips at once. The counters are durable per session, and the clock arms on the first blocked evaluation rather than at trip time, so a process restarting into a tripped guard starts a full window blocked. Tripping ends the spending on passes that reclaim nothing, and leaves a session that can only grow. Read the breaker as a diagnosis rather than a repair: your floor is too big, and no schedule of summaries fixes a floor.
 
-It took me a while to read the pass correctly. I spent a good hour convinced compaction ran beside the turn, because the call site hands the whole thing to a pooled daemon thread behind a commit fence. It does not. The turn still waits; what the thread buys is that work missing its deadline is discarded rather than half-applied. Their published run puts a micro-compaction pass at two to thirty-seven seconds, median around thirty-one, and a batch pass summarizes far more transcript than that while someone waits on a turn they asked for.
+It took me a while to read the pass correctly. I spent a good hour convinced compaction ran beside the turn, because the call site hands the whole thing to a pooled daemon thread behind a commit fence. It does not. The turn still waits; the thread only means work that misses its deadline is discarded rather than half-applied. Their published run puts a pass at two to thirty-seven seconds, median around thirty-one, and a batch pass summarizes far more than that while someone waits on a turn they asked for.
 
 ## The floor is one they chose
 
 That floor is the one number nobody can compact their way out of, so it pays to be exact about it.
 
-Their reasoning for it is good and written down. The core as a narrow waist with capability at the edges is the second of those two review lenses. The stated reason is the right one — every model tool they add is sent on every API call, so the bar for a new core tool is high. A footprint ladder pushes new capability toward a CLI command plus a skill, then service-gated tools, then plugins and MCP servers, with a core tool as the last resort. Most projects have nothing like it, and the always-available surface is the product: one agent that does the thing wherever you are talking to it, which you cannot ship with eight tools.
+Their reasoning for it is good and written down. A narrow core with capability at the edges is the second of those two review lenses, and the stated reason is the right one: every tool they add is sent on every call, so the bar for a new core tool is high. A ladder pushes new capability toward a CLI command plus a skill, then service-gated tools, then plugins and MCP servers, with a core tool as the last resort. Most projects have nothing like it, and the always-available surface is the product: one agent that does the thing wherever you are talking to it, which you cannot ship with eight tools.
 
 The core list runs to fifty-nine tools, shared by the CLI and every messaging-platform toolset. How many reach a given request depends on a per-tool availability check: smart-home control needs a token, the kanban set needs a worker or a profile that enables it, computer use needs a driver. So the number is configuration-dependent and lower, while their own comment still budgets the floor at twenty to thirty thousand tokens with fifty-plus tools. Six of the entries are the video block: four generators, a result poller, a prompting guide, all visible to anyone signed in. A cron job that files a nightly report pays to describe video generation on every call.
 
-The part that took me longest to see is that the floor is cheap in money and expensive in window. No prune touches it, and the stable tier of the prompt survives a compaction, so ordinary turns re-read it at a tenth of the price. The compaction turn is the exception: it replaces the history and rebuilds the prompt, which a comment in the loop calls a cold write on any endpoint. You therefore re-pay the floor once per compaction rather than once per turn, which is one more reason to compact later than sooner. It is also why the trigger has to be raised to three-quarters on sub-512K models, and their comment says what happens otherwise — the floor eats most of the reclaimed headroom, compaction re-fires every turn or two, and the session spends its wall clock summarizing. So the schema does not really cost these users money. It costs them the ability to stop summarizing, which is why the surrounding machinery has to exist.
-
-I have made a version of this argument before, about [23 models that were an architecture problem wearing a modeling costume](/blog/one-model-instead-of-23). The honest version here is narrower: the count is the price of the product promise, and none of the cache discipline reduces it.
+The part that took me longest to see is that the floor is cheap in money and expensive in window. No prune touches it, and the stable tier of the prompt survives a compaction, so ordinary turns re-read it at a tenth of the price. The compaction turn is the exception: it replaces the history and rebuilds the prompt, which a comment in the loop calls a cold write on any endpoint. You therefore re-pay the floor once per compaction rather than once per turn, which is one more reason to compact later than sooner. It is also why the trigger has to be raised to three-quarters on sub-512K models, and their comment says what happens otherwise — the floor eats most of the reclaimed headroom, compaction re-fires every turn or two, and the session spends its wall clock summarizing. So the schema does not really cost these users money. It costs them the ability to stop summarizing, which is why the surrounding machinery has to exist. I have made a version of this argument about [23 models that were an architecture problem in a modeling costume](/blog/one-model-instead-of-23); here the count is the price of the product promise, and none of the cache discipline reduces it.
 
 ## What travels, and what doesn't
 
 Take the cache contract away and most of this machinery loses its justification, which makes the defaults the wrong thing to copy.
 
-If your provider has no prefix cache worth protecting, or your agent is stateless per task, adopting these zeros hands you no eviction, no amortization, and one lossy summarization at the threshold. They are correct because of a constraint you may not share.
+If your provider has no prefix cache worth protecting, or your agent is stateless per task, these zeros hand you no eviction, no amortization, and one lossy summarization at the threshold. They are correct only because of a constraint you may not share.
 
 The calibration loop travels, and it is the one thing here I would put into my own system tomorrow. Record the rough estimate before the call, pair it with the provider's reported prompt-token count when the response lands, and trigger reduction on the projection instead of the guess. Then take the second half, since it is the same signal doing more work: after compacting, check the next real reading against the threshold, and if you are still over, stop, because your floor is the problem. It needs a reported token count, which most provider APIs return; a local endpoint that reports nothing, or a model switch mid-session, puts you back on the raw estimate.
 
@@ -303,6 +303,6 @@ Most harnesses never state their denominator. This one optimizes for the turn ec
 
 The rule I am keeping is narrower than the one I arrived with. Cheap context reduction never touches bytes the provider has already seen, and the next cheapest happens at a boundary you were already paying for. A compaction commit is one. So is a cache expiry, which is the boundary this repo built a mechanism for and left switched off.
 
-What stays open is where the rewriting happens at all. The durable record here is already append-only in the sense that matters: a compaction archives the pre-compaction turns rather than deleting them, and they stay on disk and searchable under the same session. What gets rewritten is the outgoing request, and that is what the gates and counters protect. So the question for the next harness is why the request is assembled by editing history rather than projected from it, so what the model sees can change without changing what the provider has seen.
+What stays open is where the rewriting happens at all. The durable record is already append-only in the sense that matters: a compaction archives the old turns instead of deleting them. What gets rewritten is the outgoing request, which is what every gate and counter here exists to protect. So the question for the next harness is why the request is assembled by editing history rather than projected from it, so what the model sees can change without touching what the provider has seen.
 
 *I'm [Kaushal Prajapati](/about), a Staff AI/ML Engineer. [More posts](/blog), or say hi on [LinkedIn](https://www.linkedin.com/in/kforcode/).*
