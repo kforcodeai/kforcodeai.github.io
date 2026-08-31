@@ -1,0 +1,53 @@
+---
+/**
+ * Callout — a single boxed claim. Used for the thesis and the pillar legend.
+ *
+ * Token-only colors, no client JS. `label` renders as a mono net-name.
+ */
+interface Props {
+	label?: string;
+	/** "accent" for the load-bearing claim, "plain" for reference boxes. */
+	tone?: 'accent' | 'plain';
+}
+
+const { label, tone = 'accent' } = Astro.props;
+---
+
+<aside class:list={['ha-callout', `ha-callout--${tone}`]}>
+	{label && <p class="ha-callout-label">{label}</p>}
+	<div class="ha-callout-body"><slot /></div>
+</aside>
+
+<style>
+	.ha-callout {
+		margin: 1.8em 0;
+		padding: 1.1rem 1.25rem;
+		border: 1px solid var(--line);
+		border-left-width: 2px;
+		border-radius: var(--radius);
+		background: var(--bg-inset);
+	}
+
+	.ha-callout--accent {
+		border-left-color: var(--accent);
+		background: var(--accent-soft);
+	}
+
+	.ha-callout-label {
+		margin: 0 0 0.5rem;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 500;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+
+	.ha-callout-body :global(> :first-child) {
+		margin-top: 0;
+	}
+
+	.ha-callout-body :global(> :last-child) {
+		margin-bottom: 0;
+	}
+</style>

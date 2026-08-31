@@ -1,0 +1,79 @@
+# src/data/harnesses/<slug>.yaml
+#
+# ── GENERATED AT THE FREEZE, NOT AUTHORED DURING READING ──────────────────
+# Do not fill this in while reading a harness — the axes are discovered, not
+# declared (PLAN.md §4). Read into docs/harness-atlas/notes/<slug>.md instead,
+# then after the axes freeze (post-T05) project the notes into this shape.
+#
+# The keys below are the PRIORS from PLAN.md Appendix B, kept only to show the
+# expected shape. Expect some to collapse, some to be dropped, and at least one
+# to be invented from a notes file's "Doesn't fit the ten" section.
+#
+# Two rules that govern what may appear here:
+#   1. An axis needs to have discriminated in >= 3 harnesses (saturation rule).
+#   2. If it would be n/a or none in more than half of them, it is a FEATURE,
+#      not an axis — it belongs in block 05b of the post, never in this file.
+#
+# Cells are APPROACH LABELS — checkable facts. Never star ratings: ratings
+# invite arguments you cannot win. Every field takes `note:` for a qualifier
+# and `src:` for the path:line@sha that proves it. `unknown` is legitimate;
+# guessing is not.
+
+slug: mini-swe-agent
+name: mini-SWE-agent
+repo: SWE-agent/mini-swe-agent
+verified: { commit: '<sha>', date: 'YYYY-MM-DD' }
+
+facts:
+  language: Python
+  license: MIT
+  core_loop_lines: 190
+  tool_count: 1
+  provider_surface: litellm
+  interaction_model: [interactive-cli, batch]
+
+primitives:
+  P01_loop:
+    control_shape: single-loop
+    termination: model-decided
+    max_rounds: configurable
+    src: 'agents/default.py:L?'
+  P02_tools:
+    action_encoding: bash-only
+    result_hygiene: truncated
+    output_caps: char-cap
+  P03_context:
+    reduction_strategy: none
+    cache_stability: byte-stable
+    trigger: n/a
+  P04_state:
+    durability: in-memory
+    resume: none
+    external_memory: none
+  P05_delegate:
+    isolation: none
+    return_type: n/a
+    model_choice: n/a
+  P06_guard:
+    permission_model: none
+    sandbox_boundary: container
+    hook_lifecycle: none
+  P07_extend:
+    mechanism: hardcoded
+    load_timing: always-in-prompt
+  P08_model:
+    provider_surface: adapter-layer
+    open_weight: first-class
+    routing: none
+  P09_cost:
+    budget_enforcement: none
+    caching: provider-cache-aware
+    output_strategy: whole-file
+  P10_eval:
+    event_stream: logs
+    eval_integration: swe-bench
+
+verdict:
+  steal: 'One sentence, names a specific mechanism.'
+  bite: 'One sentence, names a specific gap.'
+  optimizing_for: 'One sentence — the steelman.'

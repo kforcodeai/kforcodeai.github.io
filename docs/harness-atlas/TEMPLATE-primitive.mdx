@@ -1,0 +1,188 @@
+---
+title: "Evict, don't summarize: context compaction in agent harnesses"
+description: 'Why the cheapest way to free context is deletion, not summarization — the staged compaction ladder, the trade-off table, and five interview drills.'
+pubDate: 'YYYY-MM-DD'
+tags: ['agents', 'harness', 'context', 'cost']
+series:
+  name: 'harness-atlas'
+  order: 3
+  primitive: 'P03'
+proficiency: 'Intermediate'
+drills:
+  - level: 'recall'
+    q: 'What does a tool_result block have to contain for the conversation to stay valid?'
+    a: 'A tool_use_id matching the tool_use block, and content. Even a denied or failed call must return one, or the provider rejects the next request.'
+  - level: 'mechanism'
+    q: 'A tool returns 2MB of output. Trace what a well-built harness does with it.'
+    a: '…'
+  - level: 'tradeoff'
+    q: 'When is eviction wrong and summarization right?'
+    a: '…'
+  - level: 'design'
+    q: 'Design context management for a 40-turn agent, a 200k window, and a $0.10/task budget.'
+    a: '…'
+  - level: 'staff'
+    q: 'Compaction cut spend 30% and raised the retry rate 12%. What do you measure, and what do you change?'
+    a: '…'
+---
+
+import HarnessMap from '../../components/HarnessMap.astro';
+import Figure from '../../components/Figure.astro';
+import Drill from '../../components/Drill.astro';
+import Callout from '../../components/Callout.astro';
+
+{/* ══ FORM: NARRATIVE, with every H2 phrased as the question that section
+    answers, and the first 1-2 sentences under it a complete self-contained
+    answer before any elaboration. Wave 1 teaches a mechanism, so it keeps
+    the arc (blocks 02-04) that pure Q&A cannot deliver. Teardowns go full
+    Q&A instead — PLAN.md §3. ══ */}
+
+{/* ── BLOCK 0 · THE 60-SECOND ANSWER ─────────────────────────────────────
+    Self-contained. Must make sense lifted out of the page by an AI answer
+    engine or a featured snippet. Primary keyword in the first 100 words.
+    Three bullets, then one sentence that states the whole thesis. */}
+
+## What is context compaction in an agent harness?
+
+Context compaction is how a harness decides what to stop sending the model. Three things
+are true and most implementations get all three wrong:
+
+- **Deletion is cheaper than summarization** — summarizing costs an extra model call to
+  produce something lossier than the original.
+- **Tool results are the bulk of the transcript** — and the agent already extracted what
+  it needed from them.
+- **Compaction is a ladder, not a switch** — recoverable reductions first, paid summary last.
+
+**Thesis:** evict stale tool results before you summarize conversation, and keep every
+evicted result recoverable by reference.
+
+{/* ── BLOCK 1 · WHERE THIS SITS ─────────────────────────────────────────
+    The map, same in every post, this post's block lit. 80 words. Links to
+    the pillar — this is the mandatory upward link. */}
+
+## Where does this sit in the ten primitives?
+
+<HarnessMap highlight="P03" />
+
+Third of the [ten primitives](/agent-harness/) …
+
+{/* ── BLOCK 2 · THE NAIVE VERSION ───────────────────────────────────────
+    15-30 lines. It must actually work — the reader owns this baseline for
+    the rest of the post. Real language, not hand-wave pseudocode. */}
+
+## The naive version
+
+```python
+messages = []
+while True:
+    reply = model(system, messages, tools)
+    ...
+```
+
+{/* ── BLOCK 3 · WHERE IT BREAKS ─────────────────────────────────────────
+    200 words. One concrete, specific failure with numbers. The reader must
+    FEEL the problem before the mechanism is interesting. */}
+
+## Where does the naive version break?
+
+…
+
+{/* ── BLOCK 4 · PREDICT BEFORE YOU READ ─────────────────────────────────
+    One boxed question. Costs 20 words, buys retention. Do not answer it
+    immediately — answer it in block 5 or 7. */}
+
+<Callout kind="predict">
+  You have 60 messages and the window is 80% full. You can delete one category of
+  content or summarize another. Which do you pick, and what do you lose?
+</Callout>
+
+{/* ── BLOCK 5 · HOW REAL HARNESSES DO IT ────────────────────────────────
+    2-4 contrasting cases, ~250 words each. Every case:
+      - repo name + link at a pinned commit
+      - the actual file:line
+      - a one-line verdict
+    Two lateral internal links live here (to the teardown posts). */}
+
+## How do real harnesses handle it?
+
+### The staged ladder
+
+…
+
+### The pluggable condenser
+
+…
+
+### No-op, on purpose
+
+…
+
+{/* ── BLOCK 6 · THE MECHANISM ───────────────────────────────────────────
+    One diagram + a prose restatement that stands alone. The prose is not
+    optional: it is what a crawler and an LLM actually read. */}
+
+## What does the fix actually do?
+
+<Figure n="02" caption="The compaction ladder: recoverable reductions before any paid summary.">
+  {/* build-time SVG; keep the mermaid source in a comment beside it */}
+</Figure>
+
+In words: …
+
+{/* ── BLOCK 7 · THE DESIGN DEBATE ───────────────────────────────────────
+    The "discuss the design choices" requirement. A table, always, with a
+    column for what you PAY. An option with no cost means you have not
+    understood it yet. Steelman each row before critiquing it. */}
+
+## Why this way and not the other?
+
+| Option | What you gain | What you pay | Choose it when |
+|---|---|---|---|
+| Truncate oldest | Trivial to implement, zero extra calls | Silently drops the task definition | Never, in a long-running agent |
+| Evict tool results | Near-lossless, no model call | Needs artifact storage + reference discipline | Default |
+| Summarize conversation | Preserves narrative continuity | An extra call, and lossy in ways you cannot audit | After eviction is exhausted |
+| Learned compression | Highest ratio | Genuinely lossy; hard to debug | Only at a hard context limit |
+
+{/* ── BLOCK 8 · THE NUMBERS ─────────────────────────────────────────────
+    3-6 rows. Every row has a source link. No "roughly" without a citation.
+    Links to /agent-harness/numbers/. */}
+
+## What does it save, and what does it cost?
+
+| Claim | Value | Source |
+|---|---|---|
+| … | … | [link] |
+
+{/* ── BLOCK 9 · ONE IDEA / ONE TRAP ─────────────────────────────────────
+    Exactly one of each. Forces a judgment instead of a survey. This is the
+    part readers quote. */}
+
+## One idea worth stealing
+
+…
+
+## One trap worth avoiding
+
+…
+
+{/* ── BLOCK 10 · INTERVIEW DRILL ────────────────────────────────────────
+    Five rungs: recall → mechanism → trade-off → design → staff.
+    Mirrors the `drills` frontmatter, which generates FAQPage JSON-LD and
+    feeds /agent-harness/interview/. Rung 5 is mandatory. */}
+
+## Interview drill
+
+<Drill from={frontmatter.drills} />
+
+{/* ── BLOCK 11 · RECALL + NEXT ──────────────────────────────────────────
+    Open by recalling the previous post's conclusion (spaced repetition),
+    then hand off. Prev/next within the SERIES, not by date. */}
+
+## Where this leaves us
+
+[P02](/blog/…) established that tool results dominate the transcript; this post is what
+you do about it. Next: [P04](/blog/…) — …
+
+*I'm [Kaushal Prajapati](/about), a Staff AI/ML Engineer. This is part of
+[the Harness Atlas](/agent-harness/) — [all posts](/blog), or say hi on
+[LinkedIn](https://www.linkedin.com/in/kforcode/).*

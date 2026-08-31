@@ -1,0 +1,146 @@
+---
+/**
+ * Figure — schematic wrapper for inline SVG diagrams in posts.
+ *
+ * Matches the FIG.01 house style on the homepage: mono labels, token-only
+ * colors, horizontal scroll rather than a squashed diagram on mobile.
+ *
+ * Styles are `is:global` because the SVG arrives through <slot /> from MDX,
+ * where Astro's scoped class hashes are not applied. Every selector is
+ * namespaced under `.ha-fig` so nothing leaks into the rest of the page.
+ */
+interface Props {
+	/** Figure number, e.g. "01". Rendered as FIG.01. */
+	n: string;
+	/** Caption text. Also the accessible name prefix. */
+	caption: string;
+	/** Minimum SVG width before the container scrolls. */
+	minWidth?: string;
+}
+
+const { n, caption, minWidth = '720px' } = Astro.props;
+---
+
+<figure class="ha-fig" style={`--ha-fig-min:${minWidth}`}>
+	<div class="ha-fig-scroll"><slot /></div>
+	<figcaption>
+		<span class="ha-fig-n">FIG.{n}</span> — {caption}
+	</figcaption>
+</figure>
+
+<style is:global>
+	.ha-fig {
+		margin: 2em 0;
+	}
+
+	.ha-fig .ha-fig-scroll {
+		padding: 1.5rem 1.25rem;
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		background: var(--bg-panel);
+		overflow-x: auto;
+	}
+
+	.ha-fig .ha-fig-scroll svg {
+		display: block;
+		min-width: var(--ha-fig-min, 720px);
+		width: 100%;
+		height: auto;
+	}
+
+	.ha-fig svg text {
+		font-family: var(--font-mono);
+	}
+
+	/* Group label — uppercase net-name above a cluster. */
+	.ha-fig .f-g {
+		font-size: 9px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		fill: var(--muted);
+	}
+
+	.ha-fig .f-t {
+		font-size: 11px;
+		fill: var(--ink);
+	}
+
+	.ha-fig .f-title {
+		font-size: 12px;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		fill: var(--ink);
+	}
+
+	.ha-fig .f-sub {
+		font-size: 9.5px;
+		fill: var(--muted);
+	}
+
+	.ha-fig .f-accent {
+		font-size: 9.5px;
+		fill: var(--accent);
+	}
+
+	.ha-fig .f-box {
+		fill: var(--bg-inset);
+		stroke: var(--line-strong);
+		stroke-width: 1;
+	}
+
+	/* The one emphasized element per diagram. */
+	.ha-fig .f-box--accent {
+		stroke: var(--accent);
+		stroke-width: 1.5;
+	}
+
+	.ha-fig .f-box--ghost {
+		fill: none;
+		stroke: var(--line);
+		stroke-dasharray: 3 3;
+	}
+
+	.ha-fig .f-div {
+		stroke: var(--line);
+		stroke-width: 1;
+	}
+
+	.ha-fig .f-edge {
+		fill: none;
+		stroke: var(--line-strong);
+		stroke-width: 1;
+	}
+
+	.ha-fig .f-edge--accent {
+		fill: none;
+		stroke: var(--accent);
+		stroke-width: 1.5;
+	}
+
+	.ha-fig .f-dash {
+		stroke-dasharray: 4 4;
+	}
+
+	.ha-fig .f-arr {
+		fill: var(--line-strong);
+	}
+
+	.ha-fig .f-arr--accent {
+		fill: var(--accent);
+	}
+
+	.ha-fig figcaption {
+		max-width: 68ch;
+		margin-top: 0.8rem;
+		color: var(--muted);
+		font-size: 0.85rem;
+		line-height: 1.6;
+	}
+
+	.ha-fig .ha-fig-n {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.08em;
+		color: var(--ink-soft);
+	}
+</style>

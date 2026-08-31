@@ -22,3 +22,33 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# ── Harness Atlas: local working material, not for publication ──
+# Raw study workspaces (also live inside each harness repo, excluded there via .git/info/exclude)
+docs/harness-atlas/workspace/
+docs/harness-atlas/drafts/
+docs/harness-atlas/runs/
+docs/harness-atlas/reports/
+# Raw field notes and evidence logs — messy working material.
+# Flip these two lines if you decide the notes are worth publishing.
+docs/harness-atlas/notes/*
+!docs/harness-atlas/notes/README.md
+# Unpublished social drafts
+docs/harness-atlas/linkedin/*
+!docs/harness-atlas/linkedin/README.md
+
+# Internal working documents — these name employer-internal paths and framing,
+# and this repository is public. The templates and the verifier under
+# docs/harness-atlas/ are safe to track; these two are not.
+docs/HARNESS-BLOG-AGENT.md
+docs/harness-atlas/PLAN.md
+
+# local scratch
+*.local.md
+*.local.json
+scratch/
+.scratchpad/
+
+# agent/editor local state
+.claude/settings.local.json
+.claude/local/

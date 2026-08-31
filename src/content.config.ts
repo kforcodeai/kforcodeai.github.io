@@ -15,6 +15,17 @@ const blog = defineCollection({
 			updatedDate: z.coerce.date().optional(),
 			heroImage: z.optional(image()),
 			tags: z.array(z.string()).default([]),
+			// ── Harness Atlas series fields (all optional so earlier posts keep validating) ──
+			series: z
+				.object({ name: z.string(), order: z.number(), primitive: z.string() })
+				.optional(),
+			verifiedAgainst: z
+				.object({ repo: z.string(), commit: z.string(), date: z.string() })
+				.optional(),
+			drills: z
+				.array(z.object({ level: z.string(), q: z.string(), a: z.string() }))
+				.default([]),
+			proficiency: z.string().optional(),
 		}),
 });
 

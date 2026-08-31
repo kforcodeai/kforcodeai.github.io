@@ -1,0 +1,150 @@
+---
+title: '190 lines is a working agent: mini-swe-agent, read line by line'
+description: 'The smallest credible agent harness, answered question by question — what it keeps, what it refuses, and the one idea worth stealing for your own runtime.'
+pubDate: 'YYYY-MM-DD'
+tags: ['agents', 'harness', 'teardown']
+series: { name: 'harness-atlas', order: 11, primitive: 'P01' }
+verifiedAgainst: { repo: 'SWE-agent/mini-swe-agent', commit: '<sha>', date: 'YYYY-MM-DD' }
+proficiency: 'Intermediate'
+# Every H2 below is a question, so `drills` is a SUBSET of the body — the
+# rung-4/5 ones — not a separate section. FAQPage JSON-LD is honest here
+# because the page genuinely is Q&A.
+drills:
+  - level: 'design'
+    q: '…'
+    a: '…'
+  - level: 'staff'
+    q: '…'
+    a: '…'
+---
+
+import HarnessMap from '../../components/HarnessMap.astro';
+import Figure from '../../components/Figure.astro';
+import Callout from '../../components/Callout.astro';
+
+{/* ═══════════════════════════════════════════════════════════════════════
+    TEARDOWN = FULL Q&A. 12-18 questions, fixed TYPES, free QUESTIONS.
+    Target mix: type 3 (design choice) + type 4 (situational) ≈ half the
+    post. If they aren't, you wrote a tour instead of an analysis.
+
+    Craft rules (PLAN.md §3B):
+      · every question is one a real engineer would type or say aloud
+      · every answer OPENS with the answer, then the evidence
+      · no answer may depend on the previous answer — that independence is
+        the whole reason for the form
+      · vary answer length hard: some 2 sentences, some 400 words
+      · every claim carries path/file.py:L120@sha
+      · cap at 18
+    ═══════════════════════════════════════════════════════════════════════ */}
+
+{/* ── WRAPPER: block 00 · the 60-second answer ── */}
+
+## What is mini-swe-agent?
+
+<!-- Self-contained. Lifts cleanly into an AI answer. -->
+
+- …
+- …
+- …
+
+**Thesis:** …
+
+{/* ── WRAPPER: block 01 · the map ── */}
+
+## Where does it sit in the ten primitives?
+
+<HarnessMap highlight="P01" />
+
+…
+
+## Vital statistics
+
+| | |
+|---|---|
+| Repo | [`SWE-agent/mini-swe-agent`](https://github.com/SWE-agent/mini-swe-agent) |
+| Verified against | `<sha>` · YYYY-MM-DD |
+| Language · license | Python · MIT |
+| Lines in the core agent | 190 (`agents/default.py`) |
+| Tools | 1 (bash) |
+| Interaction model | interactive CLI + batch eval |
+
+{/* ═══ TYPE 1 · ORIENTATION — 2 questions ═══════════════════════════════ */}
+
+## What problem was it built for?
+
+<!-- Answer first. The steelman starts here. -->
+
+{/* ═══ TYPE 2 · MECHANISM — 3-4 questions. The tour, as questions. ══════ */}
+
+## What actually happens when you give it a task?
+
+<Figure n="02" caption="…">…</Figure>
+
+<!-- Prose restatement of the figure is mandatory. -->
+
+## What happens when a command returns 50,000 characters?
+
+## What does it send the model on turn 20 that it didn't on turn 1?
+
+{/* ═══ TYPE 3 · DESIGN CHOICE — 4-5 questions. THE HEART.
+     Steelman first, then name the cost. Never "why doesn't it just…". ═══ */}
+
+## Why one tool instead of a tool registry?
+
+<!-- What this buys: … What it costs: … -->
+
+## Why no context compaction at all?
+
+## Why is termination left to the model?
+
+## Why 190 lines — is the smallness a goal or a consequence?
+
+{/* ═══ TYPE 4 · SITUATIONAL — 3-4 questions. The judgment readers came
+     for. Name the WORKLOAD, never a vibe. ══════════════════════════════ */}
+
+## When is a single-tool harness the right call?
+
+<!-- e.g. "good under 20 turns and a known task shape; a trap past 60" -->
+
+## When does the absence of compaction stop being acceptable?
+
+## Would you put this in production, and behind what?
+
+{/* ═══ TYPE 5 · SINGULAR — unbounded, unscored, no comparison.
+     The thing with no counterpart in any other harness. Never force it
+     into a shared axis (the n/a majority test, PLAN.md §4). ════════════ */}
+
+## What does mini-swe-agent do that nothing else does?
+
+…
+
+{/* ═══ TYPE 6 · TRANSFER — 2 questions. One idea, one gap. ═════════════ */}
+
+## What would I steal from it?
+
+## Where will it bite you?
+
+{/* ═══ TYPE 7 · HARD — 2-3 rung-4/5 questions, folded into the BODY.
+     This is the differentiator: almost nothing online is written at this
+     altitude. Mirror these into `drills` frontmatter. ══════════════════ */}
+
+## How would you add compaction here without losing what makes it good?
+
+## Its success rate drops 8% when you cap output at 10k chars. What do you measure first?
+
+{/* ── WRAPPER: block 08 · the numbers ── */}
+
+## What does it actually cost to run?
+
+| Claim | Value | Source |
+|---|---|---|
+
+{/* ── WRAPPER: block 11 · recall + next ── */}
+
+## Where this leaves us
+
+[P01](/blog/…) argued the loop is the smallest part of a harness. This is that claim with a
+line count attached. Next: …
+
+*Part of [the Harness Atlas](/agent-harness/). I'm [Kaushal Prajapati](/about) — [more
+posts](/blog), or say hi on [LinkedIn](https://www.linkedin.com/in/kforcode/).*

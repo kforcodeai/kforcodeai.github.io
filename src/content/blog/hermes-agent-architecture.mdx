@@ -1,0 +1,452 @@
+---
+title: 'hermes-agent architecture: caching outranks compaction'
+description: 'A teardown of hermes-agent architecture: why the largest agent harness I have read ships both of its cheap context reclaimers off by default.'
+pubDate: '2026-08-31'
+tags: ['agents', 'harness', 'context', 'cost']
+series: { name: 'harness-atlas', order: 17, primitive: 'P03' }
+verifiedAgainst: { repo: 'NousResearch/hermes-agent', commit: '4aa9f73', date: '2026-08-31' }
+proficiency: 'Advanced'
+drills:
+  - level: 'design'
+    q: 'Your harness compacts context on a locally computed token estimate. Why is that a cost bug, not just an accuracy detail?'
+    a: 'A local estimator has a bias that varies with content — CJK text and reasoning-replay blobs can push a rough estimate to 2-3x real billed usage. Compacting on the estimate means firing at 35-55% of the real window: you pay a summarization call, stall the turn, and discard detail you did not need to discard. hermes-agent projects real usage from the last synchronized (rough, real) pair and compacts on the projection instead.'
+  - level: 'design'
+    q: 'Why would a harness gate context eviction behind a minimum reclaim of 4,096 tokens instead of evicting whenever it can?'
+    a: 'Because eviction rewrites already-sent history, which invalidates the provider prompt-cache prefix from the earliest rewritten message forward. Without a minimum-reclaim gate a busy tool loop re-fires the prune almost every iteration, turning one episodic cache break into a per-turn one. The gate plus a trigger-sized rearm runway makes breaks episodic and amortized.'
+  - level: 'staff'
+    q: 'Automatic compaction fires every other turn and the context never gets smaller. What do you measure first?'
+    a: 'The incompressible floor: system prompt plus tool schemas. Compaction can only shrink messages, so if the floor alone exceeds your trigger, every pass shrinks the transcript by a healthy margin and still leaves the prompt over the line. Measure floor size against threshold before touching the summarizer, then raise the trigger or cut the tool schema.'
+  - level: 'staff'
+    q: 'How would you add aggressive tool-result eviction to a harness whose defining constraint is prompt-cache stability?'
+    a: 'Never rewrite in place. Evict only at an existing cache boundary you are already paying for — a compaction fork or session rotation — so the break you cause is one you had already budgeted. Cap tool output at write time instead, since a result that was never large does not need evicting. Gate any commit on a minimum reclaim and require a trigger-sized regrowth runway before rearming.'
+  - level: 'staff'
+    q: 'A teammate proposes a slash command that reloads memory and rebuilds the system prompt mid-conversation. What is your review?'
+    a: 'Reject the immediate form, accept a deferred one. Rebuilding the system prompt mid-conversation invalidates the cached prefix for the rest of the session, and a cache write that is never re-read bills at roughly 1.25x plain input — so breaking the cache is worse than never having cached. The pattern that ships is deferred invalidation by default, with an opt-in --now flag.'
+  - level: 'design'
+    q: 'Where should the cache breakpoint go on a message built from a large static skill body plus a small volatile payload?'
+    a: 'At the byte where the volatile tail begins, declared by the builder that concatenated them. Searching for a delimiter at request time is unsafe because the delimiter can legitimately appear inside the skill body or inside a quoted payload, which either shrinks the cached prefix or silently absorbs volatile bytes into it, reintroducing the per-invocation miss you were trying to remove.'
+---
+
+import Figure from '../../components/Figure.astro';
+import Callout from '../../components/Callout.astro';
+
+## What is hermes-agent?
+
+**hermes-agent** is NousResearch's personal AI agent: one Python core driving a CLI, a TUI, an Electron desktop app, an editor integration, a messaging gateway across roughly twenty chat platforms, and cron. Its compaction module alone is bigger than most complete harnesses.
+
+The interesting thing about hermes-agent architecture is not its size. It is that the project wrote down a constraint most harnesses only discover in a billing dashboard, then let it overrule its own best features:
+
+<Callout label="the thesis">
+
+**Per-conversation prompt caching is sacred.** It is a written rule in the contributor guide, enforced as one of two lenses on every code review. And it inverts the usual context-management ladder: because eviction is a *rewrite*, and a rewrite breaks the cached prefix, hermes-agent ships both of its cheap deterministic context reclaimers **off by default** and leaves one expensive LLM summarization pass on.
+
+</Callout>
+
+Everyone else's advice is "evict early, summarize last." Hermes read the bill and decided the opposite. This post is why that is defensible, and where it stops being.
+
+Verified against [`NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent) at commit `4aa9f73`, read 2026-08-31; every claim cites a file and line there. The pillar verdicts are architectural reasoning from source, not benchmark results, and every number is counted from the tree or published by the repo.
+
+## Where does it sit against the ten primitives?
+
+<Figure n="01" caption="hermes-agent as one narrow waist between many surfaces and one provider. The cache plan (accented) is the subsystem this teardown is about. Below it, the three context-reduction paths: the two dashed ones are off by default, and both are off for the same reason — a commit rewrites already-sent history." minWidth="820px">
+
+{/* mermaid-equivalent source, kept for future editing:
+   surfaces --> narrow_waist --> cache_plan --> provider
+   provider -. billed prompt_tokens .-> batch_compaction
+   narrow_waist --> proactive_prune(off) & micro_compact(off) & batch_compaction(on) & session_fork
+*/}
+
+<svg viewBox="0 0 880 300" role="img" aria-labelledby="f1t f1d">
+  <title id="f1t">hermes-agent block architecture</title>
+  <desc id="f1d">Six surfaces feed one narrow-waist agent core holding a byte-stable system prompt and a 59-tool schema. The core feeds a cache plan that allocates four cache breakpoints, which feeds the provider. The provider's billed prompt token count feeds back to gate the compaction trigger. Below, four blocks: proactive prune and micro-compaction are both disabled by default, batch compaction at threshold is enabled, and compaction forks the session into a parent chain.</desc>
+
+  <defs>
+    <marker id="f1a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path class="f-arr" d="M0 0L8 4L0 8z" />
+    </marker>
+    <marker id="f1aa" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path class="f-arr--accent" d="M0 0L8 4L0 8z" />
+    </marker>
+  </defs>
+
+  <text class="f-g" x="8" y="14">surfaces</text>
+  <rect class="f-box" x="8" y="24" width="128" height="26" rx="2" />
+  <text class="f-t" x="20" y="41.5">cli</text>
+  <rect class="f-box" x="8" y="56" width="128" height="26" rx="2" />
+  <text class="f-t" x="20" y="73.5">tui · desktop</text>
+  <rect class="f-box" x="8" y="88" width="128" height="26" rx="2" />
+  <text class="f-t" x="20" y="105.5">gateway · 20+</text>
+  <rect class="f-box" x="8" y="120" width="128" height="26" rx="2" />
+  <text class="f-t" x="20" y="137.5">cron · acp</text>
+
+  <path class="f-edge" marker-end="url(#f1a)" d="M136 37 L160 37 L160 96 L184 96" />
+  <path class="f-edge" marker-end="url(#f1a)" d="M136 133 L160 133 L160 96 L184 96" />
+
+  <text class="f-g" x="184" y="14">the narrow waist</text>
+  <rect class="f-box" x="184" y="24" width="272" height="160" rx="2" />
+  <text class="f-title" x="320" y="48" text-anchor="middle">agent_loop</text>
+  <line class="f-div" x1="200" y1="62" x2="440" y2="62" />
+  <text class="f-t" x="200" y="84">system_prompt</text>
+  <text class="f-sub" x="200" y="100">byte-stable for the session's life</text>
+  <text class="f-t" x="200" y="126">tool_schema · 59 core tools</text>
+  <text class="f-sub" x="200" y="142">re-sent every request · 20-30K tok</text>
+  <text class="f-sub" x="200" y="168">toolset never swapped mid-session</text>
+
+  <path class="f-edge" marker-end="url(#f1a)" d="M456 96 L488 96" />
+
+  <text class="f-g" x="488" y="14">cache plan · p03</text>
+  <rect class="f-box f-box--accent" x="488" y="24" width="176" height="160" rx="2" />
+  <text class="f-title" x="576" y="48" text-anchor="middle">4 breakpoints</text>
+  <line class="f-div" x1="504" y1="62" x2="648" y2="62" />
+  <text class="f-sub" x="504" y="84">1 · static sys prefix</text>
+  <text class="f-sub" x="504" y="102">2 · system prompt tail</text>
+  <text class="f-sub" x="504" y="120">3-4 · last 2 turns</text>
+  <text class="f-accent" x="504" y="146">budgeted, not positional</text>
+  <text class="f-sub" x="504" y="168">request-local decoration</text>
+
+  <path class="f-edge" marker-end="url(#f1a)" d="M664 96 L696 96" />
+
+  <text class="f-g" x="696" y="14">provider</text>
+  <rect class="f-box" x="696" y="24" width="176" height="160" rx="2" />
+  <text class="f-title" x="784" y="48" text-anchor="middle">provider</text>
+  <line class="f-div" x1="712" y1="62" x2="856" y2="62" />
+  <text class="f-sub" x="712" y="84">cache_read ≈ 0.1x input</text>
+  <text class="f-sub" x="712" y="102">cache_write ≈ 1.25x input</text>
+  <text class="f-sub" x="712" y="120">output ≈ 6x input</text>
+  <text class="f-accent" x="712" y="146">reports prompt_tokens</text>
+  <text class="f-sub" x="712" y="168">the only honest signal</text>
+
+  <path class="f-edge--accent f-dash" marker-end="url(#f1aa)" d="M784 184 L784 202 L540 202 L540 224" />
+  <text class="f-accent" x="556" y="196">billed tokens gate the trigger</text>
+
+  <text class="f-g" x="8" y="214">context reduction — every commit rewrites already-sent history</text>
+  <rect class="f-box f-box--ghost" x="8" y="224" width="200" height="48" rx="2" />
+  <text class="f-t" x="20" y="245">proactive_prune</text>
+  <text class="f-sub" x="20" y="261">no LLM call · OFF by default</text>
+  <rect class="f-box f-box--ghost" x="224" y="224" width="200" height="48" rx="2" />
+  <text class="f-t" x="236" y="245">micro_compact</text>
+  <text class="f-sub" x="236" y="261">one call per turn · OFF</text>
+  <rect class="f-box" x="440" y="224" width="200" height="48" rx="2" />
+  <text class="f-t" x="452" y="245">batch compaction</text>
+  <text class="f-sub" x="452" y="261">at threshold · ON</text>
+  <rect class="f-box" x="656" y="224" width="216" height="48" rx="2" />
+  <text class="f-t" x="668" y="245">session fork</text>
+  <text class="f-sub" x="668" y="261">parent_session_id chain</text>
+</svg>
+</Figure>
+
+In words, since a diagram reads to a crawler as nothing at all: six surfaces share one agent core. That core holds two things it refuses to change mid-conversation — the system prompt and the tool schema — because both sit inside the cached prefix. Requests pass through a planner that allocates four cache breakpoints, applied to a copy, so the stored transcript never carries cache markup. The provider returns a billed prompt-token count, and that number decides whether compaction fires. Below sit three ways to shrink context: two are off out of the box, and the one left on is the most expensive and most lossy.
+
+## Vital statistics
+
+| | |
+|---|---|
+| Repo | [`NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent) · MIT |
+| Verified against | `4aa9f73` · read 2026-08-31 |
+| Language | Python core; TypeScript/React for TUI and desktop |
+| Lines in the core loop | ~3,900 (the `run_conversation` body) — versus mini-swe-agent's 190 |
+| Compaction subsystem | 7,389 lines ([`agent/context_compressor.py`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/context_compressor.py)) |
+| Approval subsystem | 5,009 lines ([`tools/approval.py`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/tools/approval.py)) |
+| Core tools per request | 59 ([`toolsets.py:L31-L92`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/toolsets.py#L31-L92)) |
+| Iteration cap | `max_iterations` 500, plus a separate refundable iteration budget |
+| Test files | 2,966 |
+| Agent-level evals | one ([`evals/readtool/`](https://github.com/NousResearch/hermes-agent/tree/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/evals/readtool)) |
+
+Legend for every verdict table below, defined once:
+
+`▲ improves · ▼ degrades · ● neutral · ◆ depends on workload`
+
+## What problem was it built for?
+
+A single conversation that never ends. You talk to Hermes from your terminal in the morning, your phone at lunch, and a cron job overnight — and the design assumes that same conversation is still alive hours later, carrying hundreds of tool results.
+
+That assumption promotes the cached prefix from a discount to the dominant line item, which is why the contributor guide lists it first: anything that "mutates past context, swaps toolsets, or rebuilds the system prompt mid-conversation invalidates that cache and multiplies the user's cost. We do not do it" ([`AGENTS.md:L19-L24`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/AGENTS.md#L19-L24)).
+
+## What happens to the prompt on turn 40 of a long session?
+
+Structurally, almost nothing — that is the point. The system prompt is byte-identical to turn 1, the tool schema is the same 59 entries, and the only new bytes are appended at the end. What gets recomputed is the cache plan.
+
+Four `cache_control` breakpoints are allocated per request: one on the static system prefix, one at the end of the system prompt, two on the most recent cacheable messages ([`agent/prompt_caching.py:L1-L8`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/prompt_caching.py#L1-L8)). Three details lift this above positional marker-stamping:
+
+- **A breakpoint is never spent on a message the provider would ignore.** On envelope-style routes a marker on an empty assistant turn is silently dropped, so `_can_carry_marker` filters those out rather than "wasting one of the four breakpoints" ([`prompt_caching.py:L91-L112`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/prompt_caching.py#L91-L112)).
+- **Breakpoints land only at the end of a completed tool run.** `_completed_transaction_endpoint_indexes` walks an assistant-with-tool-calls plus its run of results, and offers only the last result as a legal boundary ([`prompt_caching.py:L333-L382`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/prompt_caching.py#L333-L382)).
+- **The plan is request-local.** The planner deep-copies before decorating, so "the system prompt remains one stored string" and non-caching transports see an undecorated transcript ([`prompt_caching.py:L180-L183`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/prompt_caching.py#L180-L183)).
+
+Decoration must also run *after* every transcript mutation — a rule that returns below as the thing most likely to bite you ([`agent/conversation_loop.py:L2286-L2300`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/conversation_loop.py#L2286-L2300)).
+
+## How does it know the context window is full?
+
+It asks the provider, then does arithmetic on the difference. I have not seen this anywhere else.
+
+Every harness estimates the prompt size before sending, and every harness's estimate is wrong. Hermes treats that error as a measurable quantity rather than a rounding allowance. It records the rough estimate before each call, pairs it with the provider's real `prompt_tokens` when the response arrives, and re-anchors that pair on *every* response whose prompt fit ([`context_compressor.py:L2742-L2762`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/context_compressor.py#L2742-L2762)). Compaction fires on a projection, not the raw estimate:
+
+```
+projected_real = last_real + (rough_now - rough_at_last_real)
+```
+
+The source says why: the estimator deliberately over-counts so the harness compacts before a provider rejects the payload, but the margin is not a fixed percentage. CJK text is counted at about 1.7x its real cost and reasoning-replay blobs at several times theirs, so "heavy sessions can show a rough estimate 2-3x real usage and compact at 35-55% of the real window" ([`context_compressor.py:L2837-L2905`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/context_compressor.py#L2837-L2905)).
+
+The same file admits the projection is not a strict upper bound for Cyrillic, Greek, Thai or Arabic, and names its two backstops: any real reading at or over the threshold clears the baseline, and a context-overflow error still triggers reactive compaction. A harness saying where its own controller breaks is rarer than it should be.
+
+## What happens when it finally compacts?
+
+It forks the session rather than mutating it. A pass runs the summarizer, splits the SQLite session, and rotates the session id so the old transcript survives in a parent row reachable through `parent_session_id` ([`hermes_state.py:L1-L15`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/hermes_state.py#L1-L15)). Visible history shrinks; the audit trail does not, and stays full-text searchable.
+
+Two things about that pass are unusual. It runs on a pooled daemon thread behind a commit fence, so work that misses the deadline is discarded rather than half-applied — the turn still waits, but the stall is cancellable ([`agent/conversation_compression.py:L31-L52`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/conversation_compression.py#L31-L52)). And the summary is treated as hostile input to the next turn: `SUMMARY_PREFIX` runs roughly 35 lines telling the model this is "background reference, NOT as active instructions", that topic overlap does not mean resume, and that "the latest user message WINS" ([`context_compressor.py:L100-L134`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/context_compressor.py#L100-L134)).
+
+Read the accuracy cost of summarization off the length of the prompt they needed to stop their own summary from being obeyed.
+
+## Why is the cheap deterministic prune off by default?
+
+Because in this architecture it is not cheap. This is the finding that reframed the teardown for me.
+
+Hermes ships a deterministic, no-LLM prune of old tool results: dedupe, truncate oversized arguments, protect the recent tail, never call a model, keep full outputs recoverable from the session store. The top rung of every context ladder I would write myself. Its default is `0` — off ([`hermes_cli/config_defaults.py:L665`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/hermes_cli/config_defaults.py#L665)).
+
+One line of config comment says why: "each committed prune rewrites already-sent history, breaking the provider prompt-cache prefix." Micro-compaction, which amortizes compaction across turns instead of paying it in one stall, is off for the same reason spelled out at length — it "breaks the provider prompt-cache prefix EVERY turn", and should be enabled only "when you have measured that the amortized stall is worth more to you than the cached-prefix discount" ([`config_defaults.py:L688-L699`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/hermes_cli/config_defaults.py#L688-L699)).
+
+So the default ladder is: nothing, nothing, then one large summarization at the threshold. Backwards by the usual advice, and correct given the arithmetic. Eviction is free only when the deleted tokens are the only thing you pay for; here, deleting a token from the middle re-prices every token after it.
+
+| Choice | Accuracy | Latency | Cost | Why |
+|---|:--:|:--:|:--:|---|
+| Deterministic prune on by default (the usual advice) | ▲ | ▲ | ▼ | Cheap per pass and no model call, but each commit invalidates the prefix from the rewrite point forward. On a long session the re-ingest outweighs the tokens saved. |
+| Prune off; carry dead tokens instead | ▼ | ● | ▲ | Pays to re-send junk at the cached rate — roughly a tenth of the uncached rate — rather than paying full price to re-ingest the tail behind it. |
+| Micro-compaction on (flat occupancy) | ▼ | ◆ | ▼ | Removes the one long stall, but buys it with a broken prefix every turn. Only wins where the cache discount is shallow or sessions are short. |
+
+**This is a real trade, not a free win**, and it is the clearest case I have found of a workload where "evict before you summarize" is the wrong instinct.
+
+## Why must a prune reclaim 4,096 tokens before it commits?
+
+To keep cache breaks episodic instead of continuous. A prune that fires whenever it *can* fires nearly every iteration, because each new tool pair ages an older one out of the protected tail — so the gate demands a meaningful batch before committing ([`context_compressor.py:L2578-L2592`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/context_compressor.py#L2578-L2592)).
+
+Then it adds hysteresis. After a commit the next prune is blocked until the prompt regrows a full trigger-sized runway — `next_rearm_tokens = after + max(reclaimed, trigger, min_reclaim)` — and that watermark persists with the compacted rows, so a restart cannot re-fire early ([`context_compressor.py:L3441-L3502`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/context_compressor.py#L3441-L3502)).
+
+That is a Schmitt trigger applied to context management, and the config comment is the line I would quote in a design review: the gate exists to produce "one big episodic break instead of a tiny break every tool iteration."
+
+| Choice | Accuracy | Latency | Cost | Why |
+|---|:--:|:--:|:--:|---|
+| Minimum-reclaim gate + rearm runway | ● | ▲ | ▲ | No accuracy effect at all — the same messages are eventually dropped. Fewer, larger rewrites mean fewer prefix re-ingests and fewer scan passes. |
+| Commit any saving | ● | ▼ | ▼▼ | Turns one amortized break into a per-turn break, which is the failure mode micro-compaction is opt-in to avoid. |
+
+Given the cache contract, the gate is a **free win** — and worth saying loudly, because a threshold that only affects *when* you act, never *what* you keep, is the cheapest kind of improvement available.
+
+## Why judge compaction on billed tokens instead of its own estimate?
+
+Because its own estimate cannot tell it whether compaction achieved anything. Effectiveness means "did the prompt get under the threshold?", not "did the message list shrink?" — and only the provider knows the first ([`context_compressor.py:L2773-L2790`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/context_compressor.py#L2773-L2790)).
+
+The distinction matters because of a floor the harness cannot compact: system prompt plus tool schemas, which the source puts at 20-30K tokens with 50-plus tools. When that floor alone meets the threshold, "every pass shrinks messages by a healthy margin yet leaves the prompt over the line, so the next turn compacts again, forever."
+
+So a post-compaction reading at or above the threshold records a strike. Two strikes trip a breaker; after 300 seconds of continuous block one probation probe is allowed, with the counter dropped to a single strike so a bad probe re-trips immediately ([`context_compressor.py:L3034-L3080`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/context_compressor.py#L3034-L3080)). Counters are durable per session row, and the recovery clock arms lazily on the first blocked evaluation, so a restart starts a full window blocked rather than silently disarming the guard.
+
+<Figure n="02" caption="The calibration loop. The rough estimator is a sensor with measurable bias; the provider's billed token count is the reference signal. The lower row is the verdict path — whether the last compaction actually worked, judged on that same signal, feeding a durable circuit breaker." minWidth="800px">
+
+{/* mermaid-equivalent source:
+   rough_estimate --> projection --> threshold_test --> provider_call
+   provider_call -. re-anchor (rough, real) .-> projection
+   provider_call --> effectiveness_verdict --> strike_counter --> breaker
+*/}
+
+<svg viewBox="0 0 880 250" role="img" aria-labelledby="f2t f2d">
+  <title id="f2t">The real-usage calibration loop in hermes-agent</title>
+  <desc id="f2d">A rough token estimate feeds a projection block, which is compared against the compaction threshold, which gates the provider call. The provider returns a billed prompt token count that re-anchors the projection's baseline on every response whose prompt fit. A second path runs from the provider call to an effectiveness verdict, then to a durable strike counter, then to a circuit breaker that trips at two strikes and allows one probe after 300 seconds.</desc>
+
+  <defs>
+    <marker id="f2a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path class="f-arr" d="M0 0L8 4L0 8z" />
+    </marker>
+    <marker id="f2aa" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path class="f-arr--accent" d="M0 0L8 4L0 8z" />
+    </marker>
+  </defs>
+
+  <text class="f-g" x="8" y="22">turn prologue</text>
+  <rect class="f-box" x="8" y="32" width="148" height="52" rx="2" />
+  <text class="f-t" x="20" y="54">rough_estimate</text>
+  <text class="f-sub" x="20" y="72">over-counts, unevenly</text>
+
+  <path class="f-edge" marker-end="url(#f2a)" d="M156 58 L192 58" />
+
+  <text class="f-g" x="196" y="14">the controller</text>
+  <rect class="f-box f-box--accent" x="196" y="24" width="196" height="68" rx="2" />
+  <text class="f-title" x="294" y="48" text-anchor="middle">projection</text>
+  <line class="f-div" x1="212" y1="60" x2="376" y2="60" />
+  <text class="f-sub" x="212" y="80">last_real + rough_growth</text>
+
+  <path class="f-edge" marker-end="url(#f2a)" d="M392 58 L428 58" />
+
+  <rect class="f-box" x="428" y="32" width="152" height="52" rx="2" />
+  <text class="f-t" x="440" y="54">vs threshold</text>
+  <text class="f-sub" x="440" y="72">compact, or defer</text>
+
+  <path class="f-edge" marker-end="url(#f2a)" d="M580 58 L616 58" />
+
+  <rect class="f-box" x="616" y="32" width="256" height="52" rx="2" />
+  <text class="f-t" x="628" y="54">provider call</text>
+  <text class="f-sub" x="628" y="72">returns billed prompt_tokens</text>
+
+  <path class="f-edge--accent f-dash" marker-end="url(#f2aa)" d="M744 84 L744 128 L294 128 L294 92" />
+  <text class="f-accent" x="330" y="122">re-anchor the (rough, real) pair on every fitting response</text>
+
+  <path class="f-edge" marker-end="url(#f2a)" d="M820 84 L820 172" />
+
+  <text class="f-g" x="616" y="162">the verdict path</text>
+  <rect class="f-box" x="616" y="172" width="256" height="52" rx="2" />
+  <text class="f-t" x="628" y="194">effectiveness verdict</text>
+  <text class="f-sub" x="628" y="212">still over threshold? then it failed</text>
+
+  <path class="f-edge" marker-end="url(#f2a)" d="M616 198 L580 198" />
+
+  <rect class="f-box" x="424" y="172" width="156" height="52" rx="2" />
+  <text class="f-t" x="436" y="194">strike counter</text>
+  <text class="f-sub" x="436" y="212">durable, per session</text>
+
+  <path class="f-edge" marker-end="url(#f2a)" d="M424 198 L388 198" />
+
+  <rect class="f-box" x="196" y="172" width="192" height="52" rx="2" />
+  <text class="f-t" x="208" y="194">breaker trips at 2</text>
+  <text class="f-sub" x="208" y="212">300s, then one probe</text>
+</svg>
+</Figure>
+
+Restated in prose: a rough estimate feeds a projection, which is compared to the threshold, which gates the provider call. The billed token count flows back to re-anchor the projection's baseline on every response that fit, and separately decides whether the previous compaction worked. Failures accumulate into a durable strike counter that trips at two, then allows one probe every five minutes.
+
+| Choice | Accuracy | Latency | Cost | Why |
+|---|:--:|:--:|:--:|---|
+| Calibrate the trigger on billed tokens | ▲ | ▲ | ▲ | Removes compactions that never needed to happen: no needless summarizer call, no stall, no detail discarded. Improves all three. |
+| Judge effectiveness on real usage, not message count | ● | ▲▲ | ▲ | The only signal that can detect an incompressible transcript. Without it a session compacts every turn forever. |
+| Trust the local estimate (the common default) | ▼ | ▼ | ▼ | Fires at 35-55% of the real window on non-ASCII or reasoning-heavy sessions, per the repo's own note. |
+
+Both rows are **free wins**, which is unusual enough to state directly: this is a measurement improvement, not a trade. Nothing is given up to get it, and it is the single most transferable idea in the repo.
+
+## Why four cache breakpoints, and why refuse to spend one?
+
+Four is the provider's limit, so the engineering is all in the allocation. Hermes treats them as a budget with a competing claimant — the tools array — and picks a layout per destination: two on the system prompt and two on recent messages, or one plus the last three when there is no static prefix to split ([`prompt_caching.py:L1-L8`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/prompt_caching.py#L1-L8)).
+
+The refusal is the part I would copy. A marker the route ignores still consumes one of four, so a predicate decides in advance whether a message can carry one. The same instinct applies to time: a configured one-hour TTL clamps back to five minutes on Qwen and Alibaba routes rather than shipping a marker the provider drops and "creating a false 1h-cache expectation" ([`prompt_caching.py:L145-L167`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/prompt_caching.py#L145-L167)).
+
+| Choice | Accuracy | Latency | Cost | Why |
+|---|:--:|:--:|:--:|---|
+| Filter candidates before spending a breakpoint | ● | ● | ▲ | Same request, same output, strictly more of the prefix actually cached. |
+| Clamp TTL to what the route honors | ● | ● | ▲ | Prevents paying a write premium for a tier that will be ignored. |
+
+Both **free wins**, and both invisible in any metric except cache-hit rate — which is exactly why most harnesses do not do them.
+
+## Why 7,000 lines of compaction instead of sending fewer tools?
+
+Steelman first, because this is the critique. Hermes must be one agent across every one of those surfaces, and its contributor guide is genuinely strict about core surface: a "Footprint Ladder" pushes new capability to skills, service-gated tools, plugins and MCP servers, with a new core tool as the explicit last resort ([`AGENTS.md:L182-L207`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/AGENTS.md#L182-L207)). Most projects have nothing like it.
+
+And yet `_HERMES_CORE_TOOLS` has 59 entries. The floor this machinery is engineered to survive — 20-30K tokens, by their own reckoning — is a floor they chose. It is why the trigger must rise from 50% to 75% on any model under a 512K window: at 50%, "the incompressible floor … eats most of the reclaimed headroom, so compaction re-fires every 1-2 turns and the session spends most of its wall-clock summarizing" ([`context_compressor.py:L812-L821`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/context_compressor.py#L812-L821)).
+
+Read that as a latency verdict written by the people who shipped it. The fix was to compact later, not to send less.
+
+| Choice | Accuracy | Latency | Cost | Why |
+|---|:--:|:--:|:--:|---|
+| 59 tools on every request | ▼ | ● | ▼▼ | A large permanent floor paid on every call, and more schema is more for the model to choose wrongly among. |
+| Raise the trigger to 75% under 512K | ▲ | ▲▲ | ▲ | Correct given the floor — it stops the thrash. Treats the symptom. |
+| Cut the core schema instead | ▲ | ▲ | ▲▲ | Would shrink the floor itself and make the 50% default viable, at the cost of the always-available surface that is the product. |
+
+**Real trade, and the one place I think they optimized the wrong variable.** The cache discipline is superb; some of it is buying back headroom the tool schema spent.
+
+## When does the cache contract stop paying?
+
+When sessions are short, or when the prefix is small. Both invert the arithmetic that justifies everything above.
+
+The repo's own pricing table lists, for one current model: input $5.00 per million tokens, cache reads $0.50, cache writes $6.25, output $30.00 ([`agent/usage_pricing.py:L163-L172`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/usage_pricing.py#L163-L172)). My arithmetic on those figures, not a measurement: a cache read costs a tenth of a fresh read, and a cache write costs 25% *more*. A prefix you write and never re-read is worse than never caching; a prefix you re-read even once already wins.
+
+That is the whole argument. Cache-breaking is not losing a discount, it is a penalty. On a three-turn task the penalty never amortizes and this subsystem is dead weight. On a six-hour session it is the difference between a bill and a much larger one.
+
+The pillar that flips is cost, and it flips on session length, not on task difficulty.
+
+| Workload | Accuracy | Latency | Cost | Why |
+|---|:--:|:--:|:--:|---|
+| Long-lived session, large prefix | ● | ▲ | ▲▲ | The prefix is re-read dozens of times; the write premium amortizes on the second turn and everything after is a tenth-price read. |
+| Short task, small prefix | ● | ▼ | ▼ | The write premium never amortizes, and the machinery guarding it adds gates and deferrals that only postpone useful reduction. |
+
+## When should you turn micro-compaction on?
+
+When a mid-session stall costs you more than your cache discount is worth — and the repo publishes enough to reason about it, which is rare.
+
+Its design doc reports one measured session: a 3.5-hour code review, roughly 75K tokens of transcript against a 400K window. Occupancy climbed to about 22% and held flat; between the last two passes the conversation added 4,841 tokens and micro-compaction reclaimed 4,395. No batch compaction fired ([`docs/micro-compaction.md`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/docs/micro-compaction.md)). The cost, stated with no spin: passes ran 2 to 37 seconds, median around 31, on a small local model — "roughly two minutes of summarisation spread across three and a half hours."
+
+The doc calls the cache cost "the strongest argument against" the feature it documents. I have not seen another harness publish a measurement that argues against its own feature.
+
+| Choice | Accuracy | Latency | Cost | Why |
+|---|:--:|:--:|:--:|---|
+| Micro-compaction on, cadence 1 | ▼ | ◆ | ◆ | Flat occupancy and no long stall, but a broken prefix every turn and a 30-second tax on each. Older detail becomes second-hand sooner. |
+| Cadence 5 | ▼ | ▲ | ▲ | A fifth of the breaks for a fifth of the reclaim — the right dial if sessions are long and the cache discount is deep. |
+| Batch only (default) | ● | ▼▼ | ▲ | Prefix intact between compactions, paid for with one long stall at the threshold. |
+
+Turn it on when a waiting human is the scarce resource. Leave it off when the bill is.
+
+## When is this the wrong architecture to copy?
+
+When your provider has no prefix cache worth protecting, or your agent is stateless per task. Strip the contract out and most of this machinery loses its justification: the min-reclaim gate, the rearm hysteresis, the opt-in defaults, the request-local decoration. What survives is the calibration loop and the effectiveness verdict.
+
+The inverse warning matters more. If you copy the *defaults* without the contract, you have adopted the worst configuration available: no proactive eviction, no amortization, one big lossy summarization at the threshold. Those defaults are correct only because of a constraint you may not share.
+
+| Choice | Accuracy | Latency | Cost | Why |
+|---|:--:|:--:|:--:|---|
+| Copy the defaults without a prefix cache | ▼▼ | ▼▼ | ▼ | You inherit every deferral and none of the discount that justified it: dead tokens re-sent at full price, then one long lossy stall. |
+| Copy only the calibration loop and the verdict | ▲ | ▲ | ▲ | Both are provider-agnostic. They need a reported token count, which every API already returns. |
+
+## What does hermes-agent do that nothing else does?
+
+It closes the loop on its own token estimate. Every harness guesses how big the prompt is; hermes-agent is the only one that measures the error and corrects for it, re-anchoring a `(rough, real)` pair against the billed count on every response that fits. It is also the only one that asks afterwards whether the last compaction was worth doing — on that same signal, not on message count — and remembers the answer durably enough that a restart cannot lose it.
+
+A smaller one worth naming: a registry that lets the code which *built* a message declare where its cacheable prefix ends. Skill, webhook and cron builders concatenate a static scaffold with a small volatile tail, and only the builder knows the byte offset, so it registers the prefix and the planner splits there. The module refuses to infer that boundary by delimiter search, because a delimiter "can legitimately appear inside skill bodies or inside event payloads", and a bad guess "silently absorbs volatile bytes" into the prefix — reintroducing the exact miss it exists to fix ([`agent/prompt_cache_boundary.py:L1-L31`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/prompt_cache_boundary.py#L1-L31)).
+
+## What would I steal from it?
+
+The calibration loop. One idea, nearly free: record your rough estimate before the call, pair it with the provider's reported `prompt_tokens` when the response arrives, and trigger compaction on `last_real + (rough_now - rough_at_last_real)` instead of the raw estimate.
+
+Take the second half too, since it is the same signal doing more work: after compacting, check the next real reading against your threshold. Still over means your incompressible floor is the problem and no amount of summarization will fix it. Count a strike and stop trying.
+
+Most harnesses compact on a number they never validate. This is a control loop with a reference signal, and that signal is already in every API response you get.
+
+## Where will it bite you?
+
+Ordering. Cache decoration has to run dead last, after every other transcript mutation, and nothing in a type system will tell you when you have broken that.
+
+The failure is nasty. Marking a message rewrites its content from a string into a block list, so a later normalization pass checking `isinstance(content, str)` skips it. A tool result ending in a newline ships unstripped while it sits in the marked window and stripped once it rolls out — same message, different bytes on consecutive turns, breaking the prefix exactly where you meant to protect it. You see it weeks later as an unexplained cache-hit-rate sag, with no error anywhere.
+
+If you build a cache plan, make "decorate last" an assertion, not a comment.
+
+## The pillar summary
+
+Hermes's four biggest commitments, priced. Architectural reasoning from source at `4aa9f73`, not measurement.
+
+| Commitment | Accuracy | Latency | Cost | Verdict |
+|---|:--:|:--:|:--:|---|
+| A byte-stable prefix for the life of a conversation, enforced in review | ● | ▲ | ▲▲ | **Free win.** No feature is worth less than the prefix; the review lens keeps it true as the product grows. |
+| Compaction triggered and audited on the provider's billed token count | ▲ | ▲ | ▲ | **Free win.** A control loop with a real reference signal. The most transferable idea here. |
+| Both cheap reclaimers off by default, one costly summarization on | ▼ | ▼ | ▲ | **Real trade**, and correct only under this contract. Copy the reasoning, not the defaults. |
+| 59 core tools shipped on every request | ▼ | ● | ▼▼ | **Real trade, wrongly weighted.** Much of the cache discipline buys back headroom the schema spent. |
+
+**What it optimizes for:** total turn economics on a long-lived conversation — the cached prefix specifically. Not input-token count, which it will let grow rather than rewrite history. Not cost per successful task either, though the calibration loop and the anti-thrash breaker come closer than anything else I have read: both exist to stop the harness spending money on work that produces nothing. The right instinct, pointed at a subset of the problem.
+
+## What does it actually cost to run?
+
+| Claim | Value | Source |
+|---|---|---|
+| Cache read vs fresh input | ≈ 0.1x | [`usage_pricing.py:L163-L172`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/usage_pricing.py#L163-L172) |
+| Cache write vs fresh input | ≈ 1.25x — a write never re-read is a penalty | same table, my arithmetic |
+| Output vs input | ≈ 6x | same table |
+| Incompressible floor, 50+ tools | 20-30K tokens (authors' figure) | [`context_compressor.py:L2777-L2780`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/context_compressor.py#L2777-L2780) |
+| Compaction trigger | 50% of window; floored to 75% under 512K | [`context_compressor.py:L812-L821`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/context_compressor.py#L812-L821) |
+| Minimum prune reclaim | 4,096 tokens | [`config_defaults.py:L682`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/hermes_cli/config_defaults.py#L682) |
+| Anti-thrash probation window | 300s, then one probe | [`context_compressor.py:L3034-L3080`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/agent/context_compressor.py#L3034-L3080) |
+| Micro-compaction pass latency | 2-37s, median ≈31s, one per turn | [`docs/micro-compaction.md`](https://github.com/NousResearch/hermes-agent/blob/4aa9f738cedbe8a69fbd08595d0fb67f812ce2d3/docs/micro-compaction.md) |
+| Summary-marker overhead | ≈400 tokens fixed per insertion | same doc |
+
+One number I could not verify and therefore omit: the star count. No network at write time, so it is not in this post.
+
+## Where this leaves us
+
+The compaction advice I would have given before reading this — cap tool output, evict stale results, summarize as a last resort — assumes eviction is cheap. hermes-agent is the counterexample: when the provider bills a premium to re-ingest a prefix you invalidated, eviction is a rewrite, and a rewrite is expensive.
+
+The rule worth keeping: **the cheapest context reduction never touches bytes the provider has already seen.** Cap at write time, evict only at boundaries you were already paying for, and if you must rewrite, make it rare and large.
+
+What this leaves open is whether policy is the right answer at all. Hermes preserves the cache with gates, hysteresis, cooldowns and durable counters — a control system bolted onto a mutable transcript. There is another way: make the transcript append-only and let compaction swap what the model *sees* without rewriting what happened, so there is nothing to invalidate. That is the next teardown, and the two most-starred harnesses here disagree about it completely.
+
+I write about the runtime layer under AI products: [what an agent runtime actually does](/blog/the-system-layer-behind-ai-products) is the overview, and [consolidating 23 models into one](/blog/one-model-instead-of-23) is the same instinct aimed at a different bill.
+
+*I'm [Kaushal Prajapati](/about), a Staff AI/ML Engineer. [More posts](/blog), or say hi on [LinkedIn](https://www.linkedin.com/in/kforcode/).*
