@@ -17,11 +17,41 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, basename } from 'node:path';
 
+/*
+ * Two post kinds, because they are different genres with different honest shapes.
+ *
+ *   teardown — one developing argument about one subsystem. Tight by design: a
+ *              second table or a fourth pseudocode block in a teardown is padding.
+ *   study    — a guided walk through a whole harness, component by component.
+ *              Every component costs a diagram or a pseudocode block, and the
+ *              word ceiling has to fit the number of components, not the argument.
+ *
+ * The caps below are the only difference. Every voice, apparatus, fact-hygiene and
+ * accessibility check applies identically to both — a longer post is not a licence
+ * for tells, citations in the body, or unattributed numbers.
+ */
+const PROFILES = {
+	teardown: { words: [2200, 3400], h2: [6, 14], fences: 3, figures: [1, 3], tables: 2, variance: 0.30 },
+	// A whole-harness study is bounded by the number of components it covers, not by
+	// an essay's attention budget: nine subsystems, each owed a mechanism, a design
+	// choice and a price. 10,000 is roughly where that stops being a study and starts
+	// being an unedited reading log. Three tables because a study compares components
+	// (a ladder, a state matrix, a summary); a teardown arguing one point still gets two.
+	study: { words: [3500, 10000], h2: [8, 22], fences: 9, figures: [2, 4], tables: 3, variance: 0.25 },
+};
+
 const file = process.argv[2];
 if (!file) {
-	console.error('usage: verify-post.mjs <post.mdx>');
+	console.error('usage: verify-post.mjs <post.mdx> [--kind=teardown|study]');
 	process.exit(2);
 }
+const kindArg = (process.argv.find((a) => a.startsWith('--kind=')) || '').split('=')[1];
+const kind = kindArg || 'teardown';
+if (!PROFILES[kind]) {
+	console.error(`unknown --kind=${kind}; expected one of ${Object.keys(PROFILES).join(', ')}`);
+	process.exit(2);
+}
+const P = PROFILES[kind];
 const raw = readFileSync(file, 'utf8');
 const slug = basename(file).replace(/\.mdx?$/, '');
 
@@ -98,7 +128,7 @@ check(keywordRe.test(words(prose).slice(0, 100).join(' ')), 'primary keyword in 
 const questionH2s = sections.filter((s) => s.heading.trim().endsWith('?'));
 const qRatio = sections.length ? questionH2s.length / sections.length : 0;
 check(qRatio <= 0.4, '≤40% of H2s are questions', `${questionH2s.length}/${sections.length} = ${Math.round(qRatio * 100)}%`);
-check(sections.length >= 6 && sections.length <= 14, 'H2 count 6-14 (an arc, not a questionnaire)', sections.length);
+check(sections.length >= P.h2[0] && sections.length <= P.h2[1], `H2 count ${P.h2[0]}-${P.h2[1]}`, sections.length);
 
 const mean = sections.reduce((a, s) => a + s.words, 0) / (sections.length || 1);
 const sd = Math.sqrt(sections.reduce((a, s) => a + (s.words - mean) ** 2, 0) / (sections.length || 1));
@@ -107,7 +137,7 @@ const sd = Math.sqrt(sections.reduce((a, s) => a + (s.words - mean) ** 2, 0) / (
 // diagram walk-through: expanding an under-explained section raises the floor and lowers
 // the ratio, which is an improvement the check would otherwise veto. 0.30 still fails a
 // post whose sections are all within a hundred words of each other.
-check(sd / mean >= 0.30, 'section-length stdev ≥ 30% of mean', `${Math.round((sd / mean) * 100)}% (mean ${Math.round(mean)}w)`);
+check(sd / mean >= P.variance, `section-length stdev ≥ ${Math.round(P.variance * 100)}% of mean`, `${Math.round((sd / mean) * 100)}% (mean ${Math.round(mean)}w)`);
 
 const longOpeners = sections.filter((s) => (sentences(s.body)[0] || '').split(/\s+/).length > 40);
 check(longOpeners.length === 0, 'every section opens with a ≤40-word sentence', longOpeners.map((s) => s.heading).join('; '));
@@ -127,7 +157,7 @@ check(
 // ceiling was 3,200; raised to 3,400 because explaining a mechanism in plain language
 // instead of naming it costs words and is not padding. If a post is over 3,400, it is
 // long because it is unfocused, which is a different problem and still worth failing on.
-check(proseWordCount >= 2200 && proseWordCount <= 3400, 'prose word count 2200-3400', `${proseWordCount} prose (+${tableWordCount} in tables)`);
+check(proseWordCount >= P.words[0] && proseWordCount <= P.words[1], `prose word count ${P.words[0]}-${P.words[1]}`, `${proseWordCount} prose (+${tableWordCount} in tables)`);
 
 // ── apparatus that must not appear ────────────────────────────────────────
 const CITATION = /(?:[\w./-]+\.(?:py|ts|tsx|js|mjs|go|rs|md|ya?ml|toml|json):L?\d+)|(?:#L\d+)|(?:blob\/[0-9a-f]{7,40}\/)|(?:\b[\w-]+\/[\w-]+\.(?:py|ts|tsx|go|rs)\b)/g;
@@ -147,10 +177,10 @@ const STAMP = /\*\*(?:this is a )?(?:real trade|free win)[^*]*\*\*|\*\*both free
 check(!STAMP.test(proseNoTables), 'no bolded taxonomy stamps');
 
 // ── tables and pseudocode ─────────────────────────────────────────────────
-check(tables.length <= 2, '≤2 tables in the whole post', `${tables.length}`);
+check(tables.length <= P.tables, `≤${P.tables} tables in the whole post`, `${tables.length}`);
 const glyphTables = tables.filter((t) => /[▲▼●◆]/.test(t));
 check(glyphTables.length === 0, 'no glyph-notation tables', `${glyphTables.length}`);
-check(fences.length <= 3, '≤3 pseudocode blocks', fences.length);
+check(fences.length <= P.fences, `≤${P.fences} pseudocode blocks`, fences.length);
 const longFence = fences.filter((f) => f.split('\n').length - 2 > 15);
 check(longFence.length === 0, 'every pseudocode block ≤15 lines');
 const realCode = fences.filter((f) => /\b(?:import |def |self\.|const |=>|async )/.test(f));
@@ -220,7 +250,7 @@ check(/what it optimizes for|optimizes for/i.test(proseNoTables), 'states what t
 check(/steelman|the steelman is|in their own guide|the stated reason/i.test(proseNoTables) || /fair(?:est)? reading/i.test(proseNoTables), 'steelman present before the critique');
 
 // ── figures ───────────────────────────────────────────────────────────────
-check(svgs.length >= 1 && svgs.length <= 3, '1-3 diagrams', svgs.length);
+check(svgs.length >= P.figures[0] && svgs.length <= P.figures[1], `${P.figures[0]}-${P.figures[1]} diagrams`, svgs.length);
 const badA11y = svgs.filter((s) => !/role=["']img["']/.test(s) || !/<title/.test(s) || !/<desc/.test(s) || !/viewBox=/.test(s));
 check(badA11y.length === 0, 'every SVG has role, title, desc, viewBox');
 const hexes = svgs.flatMap((s) => [...s.matchAll(/(?:fill|stroke|color)=["']\s*(#[0-9a-fA-F]{3,8}|rgba?\()/g)].map((m) => m[1]));
@@ -280,7 +310,7 @@ check(drillLevels.includes('staff'), 'at least one staff-level drill', drillLeve
 
 // ── report ────────────────────────────────────────────────────────────────
 console.log(`\nverify-post · ${file}`);
-console.log(`primary keyword: "${keyword}" · ${proseWordCount} prose words · ${sections.length} H2s · ${tables.length} tables · ${svgs.length} figures\n`);
+console.log(`kind: ${kind} · primary keyword: "${keyword}" · ${proseWordCount} prose words · ${sections.length} H2s · ${tables.length} tables · ${svgs.length} figures\n`);
 const fails = results.filter((r) => !r.ok);
 for (const r of results) {
 	const tag = r.ok ? 'PASS' : 'FAIL';
