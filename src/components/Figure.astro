@@ -2,8 +2,19 @@
 /**
  * Figure — schematic wrapper for inline SVG diagrams in posts.
  *
- * Matches the FIG.01 house style on the homepage: mono labels, token-only
- * colors, horizontal scroll rather than a squashed diagram on mobile.
+ * Matches the FIG.01 house style: mono labels, token-only colors.
+ *
+ * Three width modes, because `.prose > *` caps children at 45rem (~720px) and a
+ * diagram that doesn't fit there reads as broken, not as scrollable:
+ *
+ *   default  — fits the prose measure. Author the viewBox at <= 660 units.
+ *   wide     — breaks out to the page container (~1000 usable units on desktop),
+ *              still centered on the prose column. For genuinely dense schematics.
+ *   full     — same as wide, plus edge-to-edge on large screens.
+ *
+ * Every figure is also click-to-expand: a native <dialog> shows it at viewport
+ * size for inspection. With JS off the button hides itself and the figure is
+ * still fully visible, which is why the width modes matter more than the dialog.
  *
  * Styles are `is:global` because the SVG arrives through <slot /> from MDX,
  * where Astro's scoped class hashes are not applied. Every selector is
@@ -12,28 +23,86 @@
 interface Props {
 	/** Figure number, e.g. "01". Rendered as FIG.01. */
 	n: string;
-	/** Caption text. Also the accessible name prefix. */
+	/** Caption text — one sentence naming what to look at. */
 	caption: string;
-	/** Minimum SVG width before the container scrolls. */
-	minWidth?: string;
+	/** Width mode. Default fits the prose measure; author wide diagrams as `wide`. */
+	width?: 'default' | 'wide' | 'full';
 }
 
-const { n, caption, minWidth = '720px' } = Astro.props;
+const { n, caption, width = 'default' } = Astro.props;
+const id = `fig-${n}-${Math.random().toString(36).slice(2, 8)}`;
 ---
 
-<figure class="ha-fig" style={`--ha-fig-min:${minWidth}`}>
-	<div class="ha-fig-scroll"><slot /></div>
+<figure class:list={['ha-fig', `ha-fig--${width}`]} data-fig={id}>
+	<div class="ha-fig-scroll">
+		<slot />
+		<button class="ha-fig-zoom" type="button" data-zoom={id} hidden aria-label={`Expand figure ${n}`}>
+			<span aria-hidden="true">⤢</span> expand
+		</button>
+	</div>
 	<figcaption>
 		<span class="ha-fig-n">FIG.{n}</span> — {caption}
 	</figcaption>
 </figure>
+
+<dialog class="ha-fig-modal" data-modal={id} aria-label={`Figure ${n}, expanded`}>
+	<button class="ha-fig-close" type="button" data-close={id} aria-label="Close">✕</button>
+	<div class="ha-fig-modal-body"></div>
+</dialog>
+
+<script is:inline>
+	(function () {
+		if (window.__haFigInit) return;
+		window.__haFigInit = true;
+		document.addEventListener('DOMContentLoaded', function () {
+			document.querySelectorAll('.ha-fig-zoom').forEach(function (btn) {
+				var id = btn.getAttribute('data-zoom');
+				var fig = document.querySelector('[data-fig="' + id + '"]');
+				var modal = document.querySelector('[data-modal="' + id + '"]');
+				if (!fig || !modal || typeof modal.showModal !== 'function') return;
+				var svg = fig.querySelector('svg');
+				if (!svg) return;
+				btn.hidden = false;
+				btn.addEventListener('click', function () {
+					var body = modal.querySelector('.ha-fig-modal-body');
+					body.replaceChildren(svg.cloneNode(true));
+					modal.showModal();
+				});
+				modal.querySelector('[data-close]').addEventListener('click', function () {
+					modal.close();
+				});
+				modal.addEventListener('click', function (e) {
+					if (e.target === modal) modal.close();
+				});
+			});
+		});
+	})();
+</script>
 
 <style is:global>
 	.ha-fig {
 		margin: 2em 0;
 	}
 
+	/*
+	 * Break out of the 45rem prose measure. The bleed is capped by the space
+	 * that actually exists beside the article column, not by the page
+	 * container: the blog grid is 45rem + 13rem + 5rem = 63rem and centred, so
+	 * the article sits LEFT of centre once the table of contents appears, and a
+	 * figure centred on the container hangs off the left edge everywhere
+	 * between 940px and ~1400px. A symmetric bleed is safe up to
+	 * (100vw - 63rem - 3rem) / 2, which is what this clamps to.
+	 */
+	.ha-fig--wide,
+	.ha-fig--full {
+		--ha-bleed: max(0px, min(11rem, (100vw - 66rem) / 2));
+		max-width: none !important;
+		width: calc(100% + 2 * var(--ha-bleed));
+		margin-inline: calc(-1 * var(--ha-bleed));
+	}
+
 	.ha-fig .ha-fig-scroll {
+		position: relative;
 		padding: 1.5rem 1.25rem;
 		border: 1px solid var(--line);
 		border-radius: var(--radius);
@@ -43,9 +112,84 @@ const { n, caption, minWidth = '720px' } = Astro.props;
 
 	.ha-fig .ha-fig-scroll svg {
 		display: block;
-		min-width: var(--ha-fig-min, 720px);
 		width: 100%;
 		height: auto;
+	}
+
+	/* Expand affordance — quiet until hover/focus. */
+	.ha-fig .ha-fig-zoom {
+		position: absolute;
+		top: 0.55rem;
+		right: 0.55rem;
+		padding: 0.25rem 0.5rem;
+		border: 1px solid var(--line);
+		border-radius: 3px;
+		background: var(--bg-panel);
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		cursor: pointer;
+		opacity: 0;
+		transition: opacity 0.15s ease, color 0.15s ease;
+	}
+
+	.ha-fig:hover .ha-fig-zoom,
+	.ha-fig .ha-fig-zoom:focus-visible {
+		opacity: 1;
+	}
+
+	.ha-fig .ha-fig-zoom:hover {
+		color: var(--accent);
+		border-color: var(--accent);
+	}
+
+	@media (hover: none) {
+		.ha-fig .ha-fig-zoom {
+			opacity: 1;
+		}
+	}
+
+	.ha-fig-modal {
+		width: min(96vw, 1600px);
+		max-width: 96vw;
+		max-height: 92vh;
+		padding: 2rem;
+		border: 1px solid var(--line-strong);
+		border-radius: var(--radius);
+		background: var(--bg-panel);
+		color: var(--ink);
+	}
+
+	.ha-fig-modal::backdrop {
+		background: rgb(0 0 0 / 0.72);
+	}
+
+	.ha-fig-modal-body svg {
+		display: block;
+		width: 100%;
+		height: auto;
+		max-height: 84vh;
+	}
+
+	.ha-fig-close {
+		position: absolute;
+		top: 0.6rem;
+		right: 0.75rem;
+		padding: 0.2rem 0.45rem;
+		border: 1px solid var(--line);
+		border-radius: 3px;
+		background: var(--bg-panel);
+		color: var(--muted);
+		font-size: 0.8rem;
+		line-height: 1;
+		cursor: pointer;
+	}
+
+	.ha-fig-close:hover {
+		color: var(--accent);
+		border-color: var(--accent);
 	}
 
 	.ha-fig svg text {
@@ -53,79 +197,93 @@ const { n, caption, minWidth = '720px' } = Astro.props;
 	}
 
 	/* Group label — uppercase net-name above a cluster. */
-	.ha-fig .f-g {
-		font-size: 9px;
+	.ha-fig .f-g,
+	.ha-fig-modal .f-g {
+		font-size: 11px;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		fill: var(--muted);
 	}
 
-	.ha-fig .f-t {
-		font-size: 11px;
+	.ha-fig .f-t,
+	.ha-fig-modal .f-t {
+		font-size: 12px;
 		fill: var(--ink);
 	}
 
-	.ha-fig .f-title {
-		font-size: 12px;
+	.ha-fig .f-title,
+	.ha-fig-modal .f-title {
+		font-size: 13px;
 		font-weight: 600;
 		letter-spacing: 0.05em;
 		fill: var(--ink);
 	}
 
-	.ha-fig .f-sub {
-		font-size: 9.5px;
+	.ha-fig .f-sub,
+	.ha-fig-modal .f-sub {
+		font-size: 11px;
 		fill: var(--muted);
 	}
 
-	.ha-fig .f-accent {
-		font-size: 9.5px;
+	.ha-fig .f-accent,
+	.ha-fig-modal .f-accent {
+		font-size: 11px;
 		fill: var(--accent);
 	}
 
-	.ha-fig .f-box {
+	.ha-fig .f-box,
+	.ha-fig-modal .f-box {
 		fill: var(--bg-inset);
 		stroke: var(--line-strong);
 		stroke-width: 1;
 	}
 
 	/* The one emphasized element per diagram. */
-	.ha-fig .f-box--accent {
+	.ha-fig .f-box--accent,
+	.ha-fig-modal .f-box--accent {
 		stroke: var(--accent);
 		stroke-width: 1.5;
 	}
 
-	.ha-fig .f-box--ghost {
+	.ha-fig .f-box--ghost,
+	.ha-fig-modal .f-box--ghost {
 		fill: none;
 		stroke: var(--line);
 		stroke-dasharray: 3 3;
 	}
 
-	.ha-fig .f-div {
+	.ha-fig .f-div,
+	.ha-fig-modal .f-div {
 		stroke: var(--line);
 		stroke-width: 1;
 	}
 
-	.ha-fig .f-edge {
+	.ha-fig .f-edge,
+	.ha-fig-modal .f-edge {
 		fill: none;
 		stroke: var(--line-strong);
 		stroke-width: 1;
 	}
 
-	.ha-fig .f-edge--accent {
+	.ha-fig .f-edge--accent,
+	.ha-fig-modal .f-edge--accent {
 		fill: none;
 		stroke: var(--accent);
 		stroke-width: 1.5;
 	}
 
-	.ha-fig .f-dash {
+	.ha-fig .f-dash,
+	.ha-fig-modal .f-dash {
 		stroke-dasharray: 4 4;
 	}
 
-	.ha-fig .f-arr {
+	.ha-fig .f-arr,
+	.ha-fig-modal .f-arr {
 		fill: var(--line-strong);
 	}
 
-	.ha-fig .f-arr--accent {
+	.ha-fig .f-arr--accent,
+	.ha-fig-modal .f-arr--accent {
 		fill: var(--accent);
 	}
 
@@ -142,5 +300,23 @@ const { n, caption, minWidth = '720px' } = Astro.props;
 		font-size: 0.72rem;
 		letter-spacing: 0.08em;
 		color: var(--ink-soft);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.ha-fig .ha-fig-zoom {
+			transition: none;
+		}
+	}
+
+	@media (max-width: 700px) {
+		.ha-fig--wide,
+		.ha-fig--full {
+			width: auto;
+			margin-inline: 0;
+		}
+
+		.ha-fig .ha-fig-scroll {
+			padding: 1rem 0.85rem;
+		}
 	}
 </style>
