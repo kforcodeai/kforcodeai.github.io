@@ -404,7 +404,7 @@ This is the half I had not seen in another harness, and it is why the diagram ab
 
 A calibrated trigger tells you when to compact. It says nothing about whether compacting helped. So after the next response arrives, the harness compares the provider's billed count against the threshold and asks whether the prompt actually got under the line.
 
-Note what it is not asking: whether the message list got shorter. Those two come apart, because of a floor compaction cannot touch, the system prompt plus the tool schemas that every request carries in full. Their comment is the sentence I would put in front of anyone debugging a compaction loop: when that floor alone meets the threshold, "every pass shrinks messages by a healthy margin yet leaves the prompt over the line, so the next turn compacts again, forever."
+Note what it is not asking: whether the message list got shorter. Those two come apart in three distinct ways. The floor can exceed the threshold on its own, the system prompt plus the tool schemas that every request carries in full. A local estimate can be wrong in either direction, so "still at 80% after compacting" may be a real 55%. And inserting a summary is not free: the marker scaffolding alone runs about four hundred tokens, and their published run shows a first pass that added tokens rather than removing them. Their comment is the sentence I would put in front of anyone debugging a compaction loop: when that floor alone meets the threshold, "every pass shrinks messages by a healthy margin yet leaves the prompt over the line, so the next turn compacts again, forever."
 
 The detail that makes this work is *where* the check lives, and the comment is explicit that it must not live in the obvious place.
 

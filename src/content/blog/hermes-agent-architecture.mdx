@@ -249,11 +249,29 @@ Then it does the half nobody else does.
 </svg>
 </Figure>
 
-After the next response arrives, it compares the billed count against the threshold and asks whether the prompt actually got under the line. Not whether the message list got shorter. Those two come apart, because of a floor compaction cannot touch: the system prompt plus the tool schemas, carried in full on every request. Their comment is the sentence I would put in front of anyone debugging a compaction loop. When that floor alone meets the threshold, "every pass shrinks messages by a healthy margin yet leaves the prompt over the line, so the next turn compacts again, forever."
+The check most harnesses run after compaction is "is the message list shorter?" That check can lie, because the thing you shortened and the thing you are billed for are not the same object. Here is what actually goes out every turn:
 
-A reading still over the line records a strike. Two strikes stop compaction, and so does a summarizer that keeps falling back to deterministic dropping, since the first says reduction is not helping and the second says the summarizer is unhealthy. The counters live on the session row rather than in memory, so restarting the process does not hand the loop a fresh start.
+```
+[ system prompt ][ tool schemas ][ ...messages... ][ new turn ]
+└── the floor: 20-30K tokens ───┘└── compaction ──┘
+   their figure, sent in full every turn      the only part a pass can shrink
+```
 
-Nor is the stop permanent, which is the part that took a shipped bug to get right. A guard was tripped against the transcript as it looked at that moment, and conversations keep growing, so after five minutes of continuous block one probation probe is allowed. Fail that and it re-trips on the very next verdict, which bounds a genuinely incompressible session at one attempt per window.
+Three ways a shorter list is not a smaller bill. The floor can sit above the threshold on its own, in which case every pass shrinks messages by a healthy margin and the prompt stays over the line forever, which is their comment almost verbatim. Your local estimate can be wrong in either direction, so a post-compaction reading of "still at 80%" may be a real 55%. And inserting a summary is not free: the marker scaffolding alone runs about four hundred tokens, and their own published run shows a first pass that *added* tokens rather than removing them.
+
+So the verdict is judged on the provider's billed count, which is the same number the whole exercise exists to reduce. Close the loop on the signal you are optimising, not on a proxy you compute yourself.
+
+That verdict necessarily arrives late. You cannot know the bill until the next request completes, so the sequence is compact, send, read the bill, then judge the compaction you already committed to. Which is why the mechanism needs a memory.
+
+A reading still over the line records a strike. Two strikes stop automatic compaction, and so does a summarizer that keeps falling back to deterministic dropping, since the first says reduction is not helping and the second says the summarizer is unhealthy. The code does not say why two rather than one; the obvious reading is that a single bad reading can be timing, a large paste landing right after a pass, while twice in one session is structural.
+
+The counters live on the session row rather than in memory, and that is the quietly clever part. Picture the in-memory version: a session gets stuck compacting to no effect, it feels slow, so someone restarts it, and the counter resets to zero and the loop starts again. The situations where you most need the breaker are the ones most likely to produce a restart. Every surface on the machine shares that one store, so the failure history belongs to the conversation rather than to the process.
+
+Nor is the stop permanent, which took a shipped bug to get right. A guard was tripped against the transcript as it looked at that moment, and conversations keep growing, so after five minutes of continuous block one probation probe is allowed. Fail it and it re-trips on the very next verdict, which bounds a genuinely incompressible session at one attempt per window.
+
+Be exact about what an open breaker costs you, because it is not free. Automatic compaction stops, the prompt keeps growing, and each turn is therefore dearer than the last, with a provider overflow error as the eventual backstop. What you stop paying for is the summarizer calls and the stalls, which were buying nothing. Read the breaker as a diagnosis rather than a repair: your floor is too big, and no schedule of summaries fixes a floor.
+
+Measure honestly, tolerate noise, fail safely and durably. That is the shape I would want around any expensive automated action that can quietly stop working.
 
 What I cannot tell from reading is how much the correction buys on a typical session, since nothing in the repo reports corrected triggers against raw ones. The mechanism is clearly right; the size of the win is their figure rather than mine.
 
@@ -275,7 +293,7 @@ Their reasoning for its size is good and written down. The core is described as 
 
 And yet the core list runs to fifty-nine tools, and their own comment budgets the resulting floor at twenty to thirty thousand tokens. Under this harness's own economics that floor is cheap in money, since it sits ahead of every rewrite point and is re-read at a tenth of the price. What it costs is window, and therefore time: it is why the compaction trigger has to be raised from half to three-quarters on models under a 512K window, and their comment says what happens otherwise, which is that compaction re-fires every turn or two and the session spends its wall clock summarizing.
 
-So what does this harness optimize for? Not input-token count, which it will let grow rather than rewrite history. It optimizes for the turn economics of a long-lived conversation, and specifically for the cached prefix. Not cost per successful task either, though the calibration loop and the breaker come closer than most, since both exist to stop it spending money on work that produces nothing. The gap is precise: they catch wasted harness work rather than wasted task work. Nothing here notices that the agent got the answer wrong and is about to try again.
+So what does this harness optimize for? Not input-token count, which it will let grow rather than rewrite history. It optimizes for the turn economics of a long-lived conversation, and specifically for the cached prefix. Not cost per successful task either, though the calibration loop and the breaker come closer than most, since both exist to stop it spending money on work that produces nothing. The gap is precise: they catch wasted harness work rather than wasted task work. Nothing here notices that the agent got the answer wrong and is about to retry the same failing approach. The strikes-and-breaker pattern would port to that problem unchanged, two identical failing tool calls and stop, and it is not applied there. It audits the plumbing, not the plumber.
 
 ## The one that will bite you
 
