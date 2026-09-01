@@ -1,8 +1,8 @@
 ---
-title: 'hermes-agent architecture, one component at a time'
-description: 'A guided tour of hermes-agent architecture: the loop, the prompt, the cache plan, compaction, state, approvals and delegation, and what each choice costs.'
+title: 'hermes-agent architecture: caching outranks compaction'
+description: 'The hermes-agent architecture at a glance: why the largest open-source agent harness ships both of its cheap context reducers switched off, and what that buys.'
 pubDate: '2026-08-31'
-updatedDate: '2026-08-31'
+updatedDate: '2026-09-01'
 tags: ['agents', 'harness', 'context', 'cost']
 series: { name: 'harness-atlas', order: 17, primitive: 'P03' }
 verifiedAgainst: { repo: 'NousResearch/hermes-agent', commit: '4aa9f73', date: '2026-08-31' }
@@ -10,83 +10,38 @@ proficiency: 'Intermediate'
 drills:
   - level: 'design'
     q: 'Your harness compacts context on a locally computed token estimate. Why is that a cost bug, not just an accuracy detail?'
-    a: 'A local estimator has a bias that varies with content — CJK text and reasoning-replay blobs can push a rough estimate to 2-3x real billed usage. Compacting on the estimate means firing at a third to a half of the real window: you pay a summarization call, stall the turn, and discard detail you did not need to discard. hermes-agent projects real usage from the last synchronized (rough, real) pair and compacts on the projection instead.'
+    a: 'A local estimator has a bias that varies with content: CJK text and reasoning-replay blobs can push a rough estimate to two or three times real billed usage. Compacting on the estimate means firing at a third to a half of the real window, so you pay a summarization call, stall the turn, and discard detail you did not need to discard. hermes-agent projects real usage from the last synchronized estimate-and-billed pair and fires on the projection instead.'
   - level: 'design'
-    q: 'Why would a harness gate context eviction behind a minimum reclaim of a few thousand tokens instead of evicting whenever it can?'
-    a: 'Because eviction rewrites already-sent history, which invalidates the provider prompt-cache prefix from the earliest rewritten message forward. Without a minimum-reclaim gate a busy tool loop re-fires the prune almost every iteration, since each new tool pair ages an older one out of the protected tail. The gate plus a trigger-sized rearm runway, persisted to disk so a restart cannot defeat it, makes breaks episodic and amortized.'
+    q: 'Why would a harness gate context eviction behind a minimum reclaim instead of evicting whenever it can?'
+    a: 'Because eviction rewrites already-sent history, which invalidates the prompt-cache prefix from the earliest rewritten message forward. Without a gate, a busy tool loop re-fires the prune almost every iteration, since each new tool pair ages an older one out of the protected tail. A minimum reclaim plus a regrowth runway, persisted to disk so a restart cannot defeat it, makes the breaks episodic instead of per-turn.'
   - level: 'staff'
     q: 'Automatic compaction fires every other turn and the context never gets smaller. What do you measure first?'
-    a: 'The incompressible floor: system prompt plus tool schemas. Compaction can only shrink messages, so if the floor alone exceeds your trigger, every pass shrinks the transcript by a healthy margin and still leaves the prompt over the line. Measure floor size against threshold before touching the summarizer, then raise the trigger or cut the tool schema.'
+    a: 'The incompressible floor: system prompt plus tool schemas. Compaction only shrinks messages, so if the floor alone exceeds your trigger, every pass shrinks the transcript by a healthy margin and still leaves the prompt over the line. Measure the floor against the threshold before touching the summarizer, then either raise the trigger or cut the tool schema.'
   - level: 'staff'
     q: 'Your agent runs skills and generated code inside its own process. Where should the flag that bypasses approvals be read, and why?'
-    a: 'Once, at import time, into an immutable module-level value. Reading the environment on every check means one line of injected Python (os.environ["BYPASS"]="1") silently disables every approval for the rest of the process, with no prompt and no log. Freezing at import converts a runtime switch into a launch-time argument that model-generated code cannot reach, because by the time it runs the module is already loaded. Runtime toggles then have to route through an audited, per-session path.'
+    a: 'Once, when the module loads, into an immutable value. Reading the environment on every check means one line of injected Python can disable every approval for the rest of the process, with no prompt and no log. Freezing at import turns a runtime switch into a launch-time argument that model-generated code cannot reach, because by the time it runs the module is already loaded. Runtime toggles then route through an audited per-session path.'
   - level: 'staff'
-    q: 'Compaction discards messages the model can see. How do you keep the record intact without making compaction expensive?'
-    a: 'Flip flags instead of deleting rows, and keep the search index out of it. hermes-agent marks the live set inactive and compacted in one transaction and inserts the summary as new active rows, under the same session id. Two flags distinguish "summarized away" (still searchable) from "user rewound it" (hidden). And because the full-text trigger fires only on content columns, flipping those flags does no index work at all, so archiving ten thousand messages is one cheap UPDATE.'
+    q: 'A long-lived conversation resumes after two hours. What is the cheapest moment to evict context, and why?'
+    a: 'Right then, before the first reply. A prefix cache has a lifetime, commonly five minutes, so after a long gap there is no cached prefix left to invalidate and a rewrite costs nothing. Evicting mid-burst breaks a warm prefix and re-prices everything behind the edit; evicting on resume is free. Most harnesses, including this one by default, do not wire their cheap reducer to that signal.'
   - level: 'design'
-    q: 'Where should the cache breakpoint go on a message built from a large static skill body plus a small volatile payload?'
-    a: 'At the byte where the volatile tail begins, declared by the builder that concatenated them. Searching for a delimiter at request time is unsafe because the delimiter can legitimately appear inside the skill body or inside a quoted payload, which either shrinks the cached prefix or silently absorbs volatile bytes into it, reintroducing the per-invocation miss you were trying to remove.'
-  - level: 'design'
-    q: 'A model emits several tool calls in one turn: two file reads, a patch, and a search. Do you run them in parallel?'
-    a: 'Not as a whole. Segment the batch in emission order into runs that can overlap, separated by barriers. Reads of the same subtree commute, so reader against reader is safe; a writer conflicts with any overlapping reservation, which closes the run and orders it behind. That prevents the classic write-then-read race where a batched read lands before the patch it depends on, while still overlapping the reads. Reassemble results in emission order regardless of completion order.'
+    q: 'Where should a cache breakpoint go on a message built from a large static scaffold plus a small volatile payload?'
+    a: 'At the byte where the volatile tail begins, declared by the builder that concatenated them. Searching for a delimiter at request time is unsafe because the delimiter can legitimately appear inside the scaffold or inside a quoted payload, which either shrinks the cached prefix or silently absorbs volatile bytes into it, reintroducing the per-invocation miss you were trying to remove.'
 ---
 
 import Figure from '../../components/Figure.astro';
 import Callout from '../../components/Callout.astro';
 
-An agent harness is the code between a language model and the world. It holds the conversation, decides what the model is allowed to call, runs those calls, and decides what the model gets to see on the next turn. Most of what makes an agent feel competent or useless lives in that code rather than in the model.
+Two settings in hermes-agent's config decide how it shrinks a conversation that has outgrown its context window. Both ship at zero. The expensive one, an LLM that summarizes your history and hopes the summary was faithful, is the only one switched on.
 
-So this is a walk through one, end to end: the hermes-agent architecture, which belongs to NousResearch and is the largest open-source harness I have read. [hermes-agent](https://github.com/NousResearch/hermes-agent) is a personal assistant you talk to from a terminal, a desktop app, a code editor, or any of about twenty chat platforms. We start with the loop, which is about eight lines, then add the scaffolding around it in the order the design forces: the prompt, the tool schema, the cache plan, the three ways it shrinks a conversation, where state lives, how dangerous actions get approved, and what happens when it hands work to a child.
+That inverts the advice I would have given, and have given: reduce cheaply and reversibly first, summarize last if at all.
 
-Two things are worth knowing before we start. It treats one provider feature, the prompt cache, as a constraint that outranks its own best features. And it is the only harness I have read that goes back afterwards and checks whether its own context reduction accomplished anything.
+The comment beside each zero gives the same one-line reason, and it is the key to the hermes-agent architecture. A prune rewrites history the provider has already cached.
 
-I read this code; I did not run it. Where I put a number to something, it is arithmetic on the repo's own published figures.
+## The shape, from a height
 
-## Start with the loop, because everything else is scaffolding
+NousResearch's hermes-agent is a personal assistant you reach from a terminal, a desktop app, a code editor, or any of about twenty chat platforms, and it is the largest open-source harness I have read. It is also a clean example of [the runtime layer I usually end up writing about](/blog/the-system-layer-behind-ai-products): almost nothing here is about the model.
 
-Every agent harness has this at its centre, and it is worth writing out because the rest of the post is a response to it.
-
-```
-# the whole idea, in eight lines
-messages = [system_prompt, user_message]
-while True:
-    reply = model(messages, tools=tool_schemas)
-    messages.append(reply)
-    if not reply.tool_calls:
-        return reply                # the model has stopped asking for things
-    for call in reply.tool_calls:
-        messages.append(run(call))  # this is where the world happens
-```
-
-Now look at what is wrong with it, because each fault is a component later in this post.
-
-**One.** The message list grows every iteration and never shrinks, so eventually the request does not fit, or costs more than the task is worth. **Two.** The loop needs a stop condition, and the model cannot be trusted to provide one, because a confused agent will keep calling tools forever. **Three.** The tool schema is re-sent on every single iteration, so a large toolbox is a tax on every turn rather than a one-time cost. **Four.** Running a call will happily delete a directory if the model asks it to.
-
-Four faults, four subsystems, and we will take them in that order. Hermes-agent's answers to them are more interesting than most, and they are all downstream of one decision about what kind of conversation it is having.
-
-## The workload that explains every other choice
-
-You talk to this thing from your terminal in the morning, your phone at lunch, and a cron job runs it overnight, and the design assumes that is all one conversation, hundreds of tool results deep.
-
-That assumption is doing a lot of work, and it is a runtime-layer question rather than a modeling one, which is the [layer I usually end up writing about](/blog/the-system-layer-behind-ai-products). So it is worth being concrete about the consequence. Providers will charge you a reduced rate for the part of a request they have already processed, on the condition that the bytes match exactly, starting from the very first byte. Their own pricing table lists one current model at $5.00 per million input tokens, $0.50 per million for those already-processed reads, and $6.25 to save them in the first place.
-
-Read those three numbers again, because the middle one is the whole architecture. A re-read costs a tenth of a fresh read. But saving costs a quarter *more* than not saving, so a prefix you save and never read again is a loss, and one you read back even once has already paid for itself.
-
-On a three-turn task this barely matters. On a conversation that runs all day, the front of the request gets re-sent a hundred times, and the difference between paying a tenth and paying full price for it becomes the largest recurring line on the bill. Which is why the contributor guide opens with this, as one of two properties they say every change is reviewed against:
-
-<Callout label="from their development guide">
-
-**Per-conversation prompt caching is sacred.** A long-lived conversation reuses a cached prefix every turn. Anything that mutates past context, swaps toolsets, or rebuilds the system prompt mid-conversation invalidates that cache and multiplies the user's cost. We do not do it (the one exception is context compression).
-
-</Callout>
-
-Keep that sentence in mind. Almost every design choice below is either an application of it or a workaround for it.
-
-## The map
-
-So here is the whole harness at block level, and we will visit each box in turn.
-
-<Figure n="01" caption="The components, top to bottom, and the one box everything else funnels through.">
+<Figure n="01" caption="Six surfaces, one core, and the three ways it can shrink a conversation. Two of them ship switched off.">
 
 {/* mermaid-equivalent source:
    surfaces --> core --> {context_reduction, approvals, delegation} --> {state, provider}
@@ -149,208 +104,97 @@ So here is the whole harness at block level, and we will visit each box in turn.
 </svg>
 </Figure>
 
-Six surfaces share one core. Inside that core are the four things this post is about: the loop and its budget, the registry that decides which tools exist this turn, the system prompt, and the planner that marks up the request for caching. Below it sit the three subsystems that intervene when something goes wrong, context grows too large, an action is dangerous, a task is too big for one agent, and underneath everything, the store that remembers what happened and the provider that tells you what it cost.
+One core sits behind all of it, and the interesting thing is what that core refuses to do. Two things never change mid-conversation: the system prompt and the tool schema. Both sit at the front of every request.
 
-## The system prompt is built in three tiers, and the order is the point
+A turn then goes like this. The core assembles the request, a planner marks four points in it where the provider should save its work, the marked-up copy goes out, and the provider replies with a count of how many prompt tokens it actually billed. That number, not the harness's own guess, decides whether any of the reduction paths at the bottom of the diagram fires.
 
-The prompt is assembled once per session and reused on every turn afterwards; only a compaction triggers a rebuild. It is joined from three tiers, in this order:
+Everything below is downstream of one arithmetic fact about that last number, so it is worth doing the arithmetic before looking at any of the machinery.
 
-- **stable**, the agent's identity, tool guidance, per-model operational notes, environment hints.
-- **context**, anything the caller passed in, plus context files like AGENTS.md discovered under the working directory.
-- **volatile**, the skills index, a memory snapshot, the user profile, and a line naming the session, model and provider.
+## Why a cache is worth protecting this hard
 
-You might reasonably ask why a prompt needs tiers at all. It is entirely for the cache. Since a provider only reuses work when the bytes match from the beginning, you put the things that never change at the front and herd everything that might change into a tail you have already given up on.
+Providers charge a reduced rate for the part of a request they have already processed, on the condition that the bytes match exactly from the very first byte. Their own pricing table lists one current model at five dollars per million input tokens, fifty cents per million for those already-processed reads, and six and a quarter to save them in the first place.
 
-Notice the small detail in the volatile tier: the date line records when the conversation started, rather than what time it is now. A clock in a prompt would change the bytes on every turn and cost you the entire prefix. This is the kind of thing that is obvious in hindsight and invisible until it costs you money.
+I read this code rather than running it, so treat the rest as arithmetic on their figures.
 
-<Figure n="02" caption="One request laid out top to bottom, with the four cache breakpoints marked.">
+A re-read costs a tenth of a fresh read. Saving costs a quarter *more* than not saving. So a prefix you save and never read again is a loss, and one you read back even once has already paid for itself.
 
-{/* mermaid-equivalent source:
-   stable(bp1) --> context --> volatile(bp2) --> tools --> history --> last2(bp3,bp4)
-*/}
+Which reframes what a cache miss is. Breaking the prefix is not losing a discount. It is paying a penalty up front, then paying full price to re-send everything behind the break.
 
-<svg viewBox="0 0 656 392" role="img" aria-labelledby="f2t f2d">
-  <title id="f2t">How one request is laid out, and where the four cache breakpoints go</title>
-  <desc id="f2d">A single request read top to bottom. First the stable tier of the system prompt, holding identity and tool guidance, with cache breakpoint one at its end. Then the context tier, holding AGENTS.md and workspace files. Then the volatile tier, holding the skills index, the memory snapshot and the conversation start date, with breakpoint two at the end of the system prompt. Then the tools array, fifty-nine declared and gated by availability checks at startup. Then the older history, untouched. Finally the last two cacheable messages, carrying breakpoints three and four, which move forward as the conversation grows.</desc>
+On a three-turn task none of this matters. On a conversation that runs all day, the front of the request is re-sent a hundred times, and it becomes the largest recurring line on the bill. That is the workload this harness assumes, and it is stated as one of two properties the contributor guide says every change is reviewed against:
 
-  <text class="f-g" x="0" y="12">one request, top to bottom</text>
+<Callout label="from their development guide">
 
-  <rect class="f-box" x="0" y="24" width="520" height="44" rx="2" />
-  <text class="f-t" x="16" y="42">stable tier</text>
-  <text class="f-sub" x="16" y="60">identity, tool guidance</text>
-  <rect class="f-box f-box--accent" x="544" y="34" width="96" height="24" rx="2" />
-  <text class="f-accent" x="556" y="50">bp 1</text>
+**Per-conversation prompt caching is sacred.** A long-lived conversation reuses a cached prefix every turn. Anything that mutates past context, swaps toolsets, or rebuilds the system prompt mid-conversation invalidates that cache and multiplies the user's cost. We do not do it (the one exception is context compression).
 
-  <rect class="f-box" x="0" y="76" width="520" height="44" rx="2" />
-  <text class="f-t" x="16" y="94">context tier</text>
-  <text class="f-sub" x="16" y="112">AGENTS.md, workspace files</text>
+</Callout>
 
-  <rect class="f-box" x="0" y="128" width="520" height="44" rx="2" />
-  <text class="f-t" x="16" y="146">volatile tier</text>
-  <text class="f-sub" x="16" y="164">skills, memory, start date</text>
-  <rect class="f-box f-box--accent" x="544" y="138" width="96" height="24" rx="2" />
-  <text class="f-accent" x="556" y="154">bp 2</text>
+## What that contract buys, and what it costs
 
-  <rect class="f-box" x="0" y="180" width="520" height="44" rx="2" />
-  <text class="f-t" x="16" y="198">tools</text>
-  <text class="f-sub" x="16" y="216">59 declared, gated at startup</text>
+Once a rewrite is a penalty, the cheap reducers stop being cheap.
 
-  <rect class="f-box" x="0" y="232" width="520" height="44" rx="2" />
-  <text class="f-t" x="16" y="250">history</text>
-  <text class="f-sub" x="16" y="268">older messages, untouched</text>
+The deterministic prune is the pass I would put first in any other harness. It walks old tool results, drops duplicates, summarizes oversized ones without a model, truncates bulky arguments, and leaves the full output on disk. Predictable, reversible, no model call. It ships at zero.
 
-  <rect class="f-box" x="0" y="284" width="520" height="44" rx="2" />
-  <text class="f-t" x="16" y="302">the last two cacheable messages</text>
-  <text class="f-sub" x="16" y="320">these move forward every turn</text>
-  <rect class="f-box f-box--accent" x="544" y="294" width="96" height="24" rx="2" />
-  <text class="f-accent" x="556" y="310">bp 3 · 4</text>
+Micro-compaction, which folds the oldest exchange into a rolling summary after each turn, is off for the same reason.
 
-  <text class="f-sub" x="0" y="352">everything above the tools array is identical on turn ninety</text>
-  <text class="f-sub" x="0" y="372">change a byte near the top and everything below it re-prices</text>
-</svg>
-</Figure>
+So the shipped ladder is: nothing, then nothing, then one large summarization at three-quarters of the usable input budget.
 
-### Four breakpoints, and the discipline of not spending one
-
-A cache breakpoint is how you tell the provider where to save its work, and you get four per request. That is the entire budget, and everything interesting here is in the allocation.
-
-```
-# the default layout
-bp1 = end of the stable tier          # survives everything
-bp2 = end of the system prompt        # survives until a compaction
-bp3, bp4 = the last two cacheable messages   # move forward each turn
-
-# no static prefix available? fall back to
-bp1 = end of the system prompt
-bp2..bp4 = the last three cacheable messages
-```
-
-Two on the prompt, two riding at the end of the conversation. The two at the end are the working pair: each turn spends one save on the messages it just added, and every later turn reads them back at a tenth of the price. The two at the front are the insurance, and they are why a new session on the same machine can start warm.
-
-Now the part that separates this from stamping markers on the last few messages. Three refusals:
-
-**It will not spend a breakpoint on a message the provider would ignore.** On envelope-style routes, a marker attached to an empty assistant turn, one that is nothing but tool calls, gets silently dropped. A predicate filters those out first, so the four land on messages that actually count.
-
-**It will not put a breakpoint in the middle of a tool run.** An assistant message with three tool calls, followed by three results, is one transaction; only the last result is offered as a legal boundary. Cut in the middle and the prefix you cached ends at a point the next request will not reproduce.
-
-**It will not ship a marker the route does not honour.** A configured one-hour cache tier clamps back to five minutes on Qwen and Alibaba routes, because those honour a five-minute window and ignore the longer tier. Sending it anyway would cost the write premium and create, in their words, a false expectation.
-
-The whole plan is applied to a deep copy of the messages. What gets stored on disk stays a plain transcript with no cache markup in it, which means a provider that does not support caching sees a clean request and the persistence layer never has to know any of this exists.
-
-### The failure they designed for: what happens after a restart
-
-Here is a question worth sitting with. The static prefix, the exact bytes of that stable tier, is not saved to disk. Only the full prompt is. So when a process restarts and picks up a stored session, how does it know where the cacheable part ends?
-
-It rebuilds the stable tier from scratch and then checks whether the stored prompt literally starts with it. If it does, the boundary is recovered and caching continues. If anything feeding that tier has changed since the prompt was written, someone edited the identity file, the rebuilt prefix will not match, and rather than patch the difference, the harness gives up on the optimization and sends the stored bytes untouched.
-
-Name that as a rule: when you cannot prove where a cache boundary is, lose the discount rather than rewrite the bytes. A wrong boundary does not merely miss the cache, it silently poisons every later turn.
-
-### When only the builder knows where the prefix ends
-
-One mechanism here solves a problem you only hit at a certain scale, and I have not seen it in another harness.
-
-Some messages are machine-built: a skill invocation, a webhook delivery, a cron job. Those get assembled by concatenating a large static scaffold, the expanded skill body, the activation notes, with a small volatile tail, like the ticket payload or the timestamp of this particular run. The scaffold is identical every time. The tail never is.
-
-If you cache that message as one block, you pay a fresh write on every invocation, because the tail moved. If you could split it at the byte where the scaffold ends, the expensive half would be cached and only the cheap half would be new.
-
-You might be thinking: just find the delimiter and split there. So was I, and the module rejects that explicitly. A scaffold marker can legitimately appear *inside* a skill body or inside an event payload, and a delimiter search that guesses wrong either shrinks the cached region or, worse, absorbs volatile bytes into the cached prefix, which reintroduces the per-invocation miss you were trying to eliminate, silently.
-
-So the code that built the message registers where its stable prefix ends, at construction time, and the planner consults that registry instead of guessing.
-
-```
-# at construction time, the builder knows the offset
-register_stable_prefix(scaffold)         # skills, webhooks, cron all do this
-
-# at request time, the planner looks it up rather than guessing
-prefix = find_stable_prefix(message)
-if prefix:
-    split message into [cached: prefix] + [uncached: the rest]
-```
-
-The registry is bounded two ways, at thirty-two entries and a few megabytes, evicting least-recently-used but never the newest entry, so one oversized scaffold cannot silently disable the split for everyone else. A cron job firing every minute also refreshes on use, so it does not get evicted by a burst of one-off skill calls.
-
-I have not seen another harness do this. It is a clean example of a general principle: the component that assembled a thing knows something about it that no later inspection can recover, so have it declare that knowledge rather than re-derive it.
-
-## Three ways to shrink a conversation, and two of them ship switched off
-
-That prompt sits in front of a transcript that grows forever, which was the first fault in our eight-line loop. Hermes has three answers to it, and this is where I stopped and re-read the config file twice.
-
-**The deterministic prune** walks old tool results, drops duplicates, summarizes oversized ones without calling a model, truncates bulky call arguments, and leaves the full output retrievable from the store. Cheap, predictable, reversible. Its trigger ships at zero.
-
-**Micro-compaction** folds the oldest un-absorbed exchange into a rolling summary after each turn, so occupancy stays flat instead of sawtoothing up to a threshold. It ships off.
-
-**Batch compaction** waits until the prompt crosses a threshold, then calls a model to summarize the middle of the conversation. It is the expensive one, the lossy one, and it is the only one enabled by default.
-
-If you have read anything about context management, that ordering is backwards. The standard ladder caps what you write, evicts what is stale, and summarizes only as a last resort, because summarizing costs a model call and loses detail you cannot recover. Hermes ships the last rung and leaves the first two to you.
-
-The comment beside each disabled setting gives the same reason, and by now you can predict it: **each committed prune rewrites already-sent history, breaking the provider prompt-cache prefix.**
-
-That is the trap in the standard advice. Eviction is free when the deleted tokens are the only thing you were paying for. In a cached conversation, deleting a message from the middle re-prices every message behind it, because the byte-exact match the discount depends on ends at your edit.
-
-| The choice | What it saves | What it costs |
+| The choice | What it buys | What it costs |
 |---|---|---|
-| Prune on, the usual advice | The dead tool-result tokens on every later turn in the burst | A re-ingest of everything behind the edit, every time it commits |
-| Prune off, carry the junk | Nothing. The junk rides along in history | Cached re-sends at a tenth of fresh input, plus window: dead tokens pull the expensive summarization forward |
-| Micro-compaction on | On their published run, occupancy flattened at about a fifth of the threshold and batch compaction never fired at all | A broken prefix every turn, and a pass that ran two to thirty-seven seconds, median around thirty-one, on one contended local model |
+| Prune on, the usual advice | Dead tool-result tokens stop being re-sent | A re-ingest of everything behind the edit, every time it commits |
+| Prune off, carry the junk | The prefix stays warm, so the bill stays at a tenth | Window: dead tokens pull the expensive summarization forward |
+| Micro-compaction on | Occupancy stays flat, and on their published run the big summarization never fired at all | A broken prefix every turn, plus a pass that ran two to thirty-seven seconds each time |
 
-Those columns are honest about money and vague about accuracy. Carrying junk is cheap in tokens, but stale tool output is not inert: a superseded file listing is something the model can read and act on. Nothing in the repo measures that, and neither can I from reading it.
+I went in expecting to file those two zeros as an oversight, a half-built feature someone left switched off. The zero is the decision, and the feature exists for the workloads where the arithmetic tips the other way, which is most of them.
 
-I went in expecting to file those two zeros as an oversight, a half-built feature left switched off. The zero is the decision, and the feature exists for the workloads where the arithmetic tips the other way.
+## Five minutes
 
-### What happens when you do switch pruning on
+There is a hole in all of this, and I re-read the config twice before I noticed it.
 
-The config comment names the workload where you should: a large-window model where the threshold rarely fires, so bulky terminal dumps and file reads ride along in history and get re-sent every turn.
+A cached prefix has a lifetime. The shipped default here is the five-minute tier.
 
-A prune only commits if it reclaims about four thousand tokens, roughly the weight of two oversized tool results by the repo's own definition. Why refuse a smaller win? Because a prune that fires whenever it *can* fires on nearly every iteration: each new tool pair ages an older one out of the protected tail, so there is always something to drop, and every one of those fires would break the cache. The gate insists on a meaningful batch before paying that price.
+Now put that against the workload the architecture is justified by: terminal in the morning, phone at lunch, a cron job overnight, all one conversation. At five minutes, the prefix is stone cold at every one of those transitions, and the first turn back pays a full write no matter what anyone did to the transcript. Nothing in the cache planner looks at how long the session has been idle.
 
-Then it adds hysteresis, which is the part I would not have thought of.
+Which means the coldest moment in this workload is also the cheapest moment to rewrite history, because there is nothing left to invalidate. A prune that would be expensive mid-burst is free on resume.
 
-```
-# a prune commits only if it clears the gate
-reclaimed = before - after
-if reclaimed < MIN_RECLAIM:              # a few thousand tokens
-    keep the junk, try again later
+They built the machinery for exactly that moment. Idle compaction fires when a session resumes after a configurable gap and reduces the transcript before the first reply. It is opt-in, it ships at zero like the others, and it calls the summarizer rather than the cheap deterministic pass.
 
-# and then it must wait out a runway before re-arming
-runway   = max(reclaimed, trigger, MIN_RECLAIM)
-rearm_at = after + runway                # written to disk with the compacted rows
-```
+So the rule this architecture implies, and stops one step short of adopting: prune hard on resume, never mid-burst.
 
-After a commit, the next prune is blocked until the prompt regrows at least as much as was just reclaimed, and that watermark is written to disk alongside the compacted rows. That last part is the detail worth stealing: someone worked out that restarting the process is the obvious way to defeat a cooldown held in memory, and closed it.
+## The mechanism I would copy tomorrow
 
-Hysteresis is not free. Junk now lives in context for up to a full runway longer than it needs to, and a batched schedule drops a different set of messages than an eager one would. Against a per-turn cache break it is still cheaper.
+Everything above hangs off one number: an estimate of how large the next request is. Every harness computes that locally, before sending. Every harness gets it wrong, because tokenization depends on content you are guessing about.
 
-### The number that fires all of this is wrong
+Hermes treats that error as a measurable quantity.
 
-Every gate above is downstream of one quantity: an estimate of how large the next request will be. Every harness computes that locally, before sending, and every harness's estimate is wrong, because tokenization depends on content the harness is guessing about. Hermes is unusual in treating the error as measurable rather than as a rounding allowance.
+Their estimator over-counts on purpose, so compaction happens before a provider rejects the payload. But the margin is not a fixed percentage. Their own note puts CJK text at about seventy percent over its real cost, and reasoning-replay blobs at several times theirs. A heavy session can show an estimate two or three times real usage.
 
-Their estimator over-counts on purpose, so that compaction happens before a provider rejects the payload, but the margin is not a fixed percentage. Their own note puts CJK text at about seventy percent over its real cost and reasoning-replay blobs at several times theirs, so a heavy session can show an estimate two to three times real usage and fire compaction at a third to a half of the real window.
+Sit with what that means. You believe you are at ninety percent of the window. You are at forty. So you pay for a summarizer call you did not need, stall a turn nobody needed stalled, and throw away detail for nothing, and none of it shows up as an error.
 
-Sit with what that means. You believe you are at ninety percent of the window; you are actually at forty. So you pay for a summarizer call you did not need, stall a turn nobody needed stalled, and throw away detail for nothing. The bug is invisible, because everything downstream looks like it worked.
-
-So they close the loop. The rough estimate is recorded before each call, paired with the provider's billed prompt-token count when the response arrives, and re-anchored on every response whose prompt fit rather than only after a compaction. The trigger then fires on a projection rather than the raw guess.
+So they close the loop:
 
 ```
 before the call:  rough = estimate(messages, tools)
 after the call:   real  = response.usage.prompt_tokens
                   if the prompt fit: baseline = (rough, real)
 
-# fire on the projection, not the raw estimate
+# fire on the projection, not the raw guess
 growth    = max(0, rough_now - baseline.rough)
 projected = baseline.real + growth
 if projected >= threshold: compact()
 ```
 
-Look at the shape of that and you can find the blind spot yourself. It corrects the bias it has already observed, then trusts the new increment at face value, so what it cannot anticipate is a fresh paste of exactly the content the correction exists for. The module is candid: the projection is not a strict upper bound for Cyrillic, Greek, Thai or Arabic, and it names two backstops, a real reading at or above the threshold clearing the baseline, and a provider overflow error still triggering compaction.
+Two things make this better than it looks. The pair is re-anchored on every response whose prompt fit, not just after a compaction, so the correction tracks the session as it drifts. And the harness is candid about where the correction fails: it is not a strict upper bound for Cyrillic, Greek, Thai or Arabic, with a provider overflow error as the backstop.
 
-One thing I could not work out from reading: how much the correction actually buys on a typical session, since nothing in the repo reports corrected against raw trigger points. The mechanism is clearly right; the size of the win is their figure rather than mine.
+Notice what this buys, because it is unusual. A trigger that fires at the right time is more accurate, since detail stops being discarded for no reason. It is cheaper, since the summarizer call is not made. And it is faster, since the stall does not happen. Most context work buys one of those by giving up another. This one gives up nothing to get all three, which is rare enough to be worth stopping on.
 
-<Figure n="03" caption="The trigger fires on a projection re-anchored to billed usage, and the same signal decides afterwards whether the compaction achieved anything.">
+Then it does the half nobody else does.
+
+<Figure n="02" caption="The trigger fires on a projection re-anchored to billed usage, and the same signal decides afterwards whether the compaction achieved anything.">
 
 {/* mermaid-equivalent source:
    rough --> projection --> threshold --> provider
-   provider -. re-anchor (rough, real) .-> projection
-   provider --> did_it_work --> strike_counter --> breaker
+   provider -. re-anchor .-> projection
+   provider --> did_it_work --> strikes --> breaker
 */}
 
 <svg viewBox="0 0 656 272" role="img" aria-labelledby="f2t f2d">
@@ -405,350 +249,46 @@ One thing I could not work out from reading: how much the correction actually bu
 </svg>
 </Figure>
 
-### And then it asks whether the compaction was worth doing
+After the next response arrives, it compares the billed count against the threshold and asks whether the prompt actually got under the line. Not whether the message list got shorter. Those two come apart, because of a floor compaction cannot touch: the system prompt plus the tool schemas, carried in full on every request. Their comment is the sentence I would put in front of anyone debugging a compaction loop. When that floor alone meets the threshold, "every pass shrinks messages by a healthy margin yet leaves the prompt over the line, so the next turn compacts again, forever."
 
-This is the half I had not seen in another harness, and it is why the diagram above has a second row.
+A reading still over the line records a strike. Two strikes stop compaction, and the counters live on the session row rather than in memory, so restarting the process does not hand the loop a fresh start.
 
-A calibrated trigger tells you when to compact. It says nothing about whether compacting helped. So after the next response arrives, the harness compares the provider's billed count against the threshold and asks whether the prompt actually got under the line.
+What I cannot tell from reading is how much the correction buys on a typical session, since nothing in the repo reports corrected triggers against raw ones. The mechanism is clearly right; the size of the win is their figure rather than mine.
 
-Note what it is not asking: whether the message list got shorter. Those two come apart, because of a floor compaction cannot touch, the system prompt plus the tool schemas that every request carries in full. Their comment is the sentence I would put in front of anyone debugging a compaction loop: when that floor alone meets the threshold, "every pass shrinks messages by a healthy margin yet leaves the prompt over the line, so the next turn compacts again, forever."
+## Three more decisions worth appreciating
 
-A reading still over the line records a strike. Two strikes trip a breaker, and after five minutes one probe is allowed, with the counter dropped to a single strike so a bad probe re-trips at once. The counters are durable per session, and the clock arms on the first blocked evaluation rather than at trip time, so a process restarting into a tripped guard starts a full window blocked.
+**Only the builder knows where a message's cacheable part ends.** Skill, webhook and cron messages are a large static scaffold concatenated with a small volatile tail. Cache the whole thing and you pay a fresh write every invocation. So the code that *built* the message registers the byte where the scaffold ends, and the planner reads that registry rather than guessing. They refuse to search for a delimiter, because a delimiter can legitimately appear inside a scaffold, and a bad guess silently absorbs volatile bytes into the cached prefix, reintroducing the exact miss it was meant to remove. Cheaper, with no accuracy risk at all.
 
-Be clear about what tripping buys and what it leaves. It ends the spending on passes that reclaim nothing. It leaves a session that can only grow toward the provider's hard limit. Read the breaker as a diagnosis rather than a repair: your floor is too big, and no schedule of summaries fixes a floor.
+**The approval bypass is frozen when the code loads.** The agent runs skills and generated code inside its own process, so if the bypass flag were read from the environment on every check, one line of injected Python would disable every approval for the rest of the process, with no prompt and no log. Reading it once at import turns a runtime switch into a launch-time argument that model-generated code cannot reach. Control, at zero runtime cost, and the sort of thing you only think of after imagining the attack.
 
-### The boundary they built and left switched off
+**Compaction is a flag flip, not a delete.** The archived messages stay on disk, still searchable, marked in a way that distinguishes "summarized away" from "the user rewound it". And because the search index only fires on content columns, flipping those flags does no index work at all, so archiving ten thousand messages is one cheap update. Durability and speed at the same time, which is what a good schema choice looks like.
 
-One thing about caching gets skipped in almost everything written about it: a cached prefix has a lifetime. The shipped default here is the five-minute tier, with an hour available on request.
+There is a fourth I will mention in passing because it is the clearest latency win in the codebase: when the model emits several tool calls at once, the batch is cut into runs that can safely overlap, reserving file paths as readers or writers. Concurrent reads of the same subtree commute; a writer conflicts with any overlap. So independent reads run together while the read-after-write ordering the model depended on is preserved.
 
-Now put that next to the workload. Terminal in the morning, phone at lunch, cron overnight. At five minutes, the prefix all this machinery protects is stone cold at every one of those transitions, and the first turn back pays a full write no matter what anyone did to the transcript. The contract binds hard inside a burst of turns and not at all across the gaps between them, and nothing in the cache planner looks at how long a session has been idle.
+## Where the design runs out
 
-Which points somewhere the defaults do not go. A prune is expensive when the prefix is warm and free when it is cold, and the coldest moment in this workload is the one the product is built around: you come back after lunch.
+Every number above is measured against a threshold, and the threshold has to clear that floor: system prompt plus tool schemas.
 
-Hermes has machinery for exactly that. Idle compaction, opt-in and shipping at zero like the others, fires when a session resumes after a configurable gap, above a size floor, and pays for a full summarization before the first reply. That is the expensive reclaimer arriving at the cheap boundary, with the cheap one still wired to nothing. The code justifies it as not re-reading stale context and never says the quiet part: a resume past the cache lifetime is the one moment when a rewrite costs nothing, because there is nothing left to invalidate.
+Their reasoning for its size is good and written down. The core is described as a narrow waist with capability at the edges, and the stated reason is the right one, that every tool they add is sent on every call. A ladder pushes new capability toward a CLI command plus a skill, then service-gated tools, then plugins, with a core tool as the last resort. Most projects have nothing like it, and the always-available surface is the product.
 
-Prune hard on resume, never mid-burst, is the rule this architecture implies and stops one step short of adopting.
+And yet the core list runs to fifty-nine tools, and their own comment budgets the resulting floor at twenty to thirty thousand tokens. Under this harness's own economics that floor is cheap in money, since it sits ahead of every rewrite point and is re-read at a tenth of the price. What it costs is window, and therefore time: it is why the compaction trigger has to be raised from half to three-quarters on models under a 512K window, and their comment says what happens otherwise, which is that compaction re-fires every turn or two and the session spends its wall clock summarizing.
 
-## The second fault: knowing when to stop
+So what does this harness optimize for? Not input-token count, which it will let grow rather than rewrite history. It optimizes for the turn economics of a long-lived conversation, and specifically for the cached prefix. Not cost per successful task either, though the calibration loop and the breaker come closer than most, since both exist to stop it spending money on work that produces nothing. The gap is precise: they catch wasted harness work rather than wasted task work. Nothing here notices that the agent got the answer wrong and is about to try again.
 
-That is the first fault handled. The second was the stop condition, and it lives in the loop's own header. Here is the real condition:
+## The one that will bite you
 
-```
-while (api_calls < max_iterations and budget.remaining > 0) or grace_call:
-    reply = model(messages, tools=snapshot)
-    api_calls += 1
-    budget.consume()
-    ...run tool calls, append results, continue...
-```
+Cache markers have to be applied dead last, after every other change to the transcript, and nothing in a type system will tell you when you have broken that.
 
-Three things in that line are worth knowing, and two of them are archaeology.
+Marking a message rewrites its content from a plain string into a list of blocks. A later pass that type-checks for a string then skips it. So a tool result ending in a newline ships unstripped while it sits in the marked window, and stripped once it rolls out: same message, different bytes on consecutive turns, breaking the prefix exactly where the markers existed to protect it. You find out weeks later from a sag in your cache hit rate, with no error anywhere.
 
-The ceiling first. The iteration cap is how many times the model may be called before the turn is cut off, and finding its default is a small adventure: the constructor says ninety, the CLI hands it five hundred, a subagent gets two hundred and fifty from config, and the budget class's own docstring says five hundred for parents and fifty for children. Four numbers, and only one of them is what you get. Read the code, not the comments, including in this post.
-
-The second guard, the one about remaining budget, looks like a separate allowance and is not. The budget object is thrown away and rebuilt at the start of every turn, and both counters move together, so the two halves are the same predicate. The object exists for a case where a shared budget is injected from outside; the turn prologue overwrites it before it can matter.
-
-And the third clause is dead. That grace flag is initialized to false, read twice, and never set to true anywhere in the repository. The behaviour it describes is real, but it moved: when a turn ends without the model producing any text, the finalizer makes one extra call with the tool schema stripped out entirely, asking for a summary of what happened. Stripping the tools is the part worth copying, because "please stop calling tools" as an instruction is a request, and removing them from the schema is a fact.
-
-### Why a counter that goes backwards is the interesting part
-
-Now the good bit. Six places in that loop *refund* an iteration, decrementing both counters together.
-
-You might reasonably ask why you would ever hand a turn back. The rule is that the budget measures model turns the user asked for, not attempts the machinery made. So an iteration that never reached the provider does not count: a compression pass that fired before the request, a local runtime whose context turned out too small to hold the tool schema, a mid-turn correction that cancelled the in-flight call, a provider failover.
-
-That last one is a quality decision rather than bookkeeping, and the comment says so, the refund exists so the fallback provider "gets a fair turn" instead of inheriting a budget already spent by the provider that failed.
-
-The sixth refund is the one I would steal. If the only tool the model called in an iteration was the code-execution tool, the one that lets it batch many operations into a single programmatic call, the iteration is free. That is a price signal aimed at the model: the cheaper pattern costs it nothing from its budget.
-
-The cost of all this is six hand-maintained decrement pairs, and the comments record what happens when one is missed. A skipped turn once leaked a budget unit for the life of the agent, and the turn log reported an API call that never happened.
-
-Worth separating two jobs that look alike here. A counter that can go backwards is an accounting mechanism. The things that actually stop runaway behaviour in this codebase are elsewhere: retry ceilings, cooldowns, and the breakers we met earlier.
-
-### Interrupting a turn without breaking the cache
-
-There is a feature in that loop I did not expect: you can talk to the agent while it is working, and your correction lands mid-turn.
-
-That sounds simple and is not, because a turn in progress holds provider-specific state. Reasoning blocks from a thinking model are signed, or require the output that follows them, so you cannot staple a user message onto a half-finished assistant turn and expect the next request to validate.
-
-What it does instead: keep only the *visible* response text produced so far, demote it to ordinary assistant text, then append your correction as a real user message. Role alternation stays valid, the provider gets a replayable transcript, and, in the code's own words, every previously cached message is left byte-for-byte unchanged. Even the interrupt path protects the prefix.
-
-There is an invariant next to it worth adopting wholesale: raw chain-of-thought must never be serialized into replayable message content. Streamed reasoning is display state. Show it live, but do not let it re-enter the transcript, or the next request reads as though the model said all of its thinking out loud.
-
-## Where the conversation actually lives
-
-One SQLite file, in write-ahead mode so many readers can coexist with a single writer, with a full-text index over every message. The write-ahead mode is not a detail: a gateway serving twenty chat platforms, a desktop app, a CLI and cron are all reading that file at once.
-
-The full-text index is not a convenience for a history browser, either. It is the agent's long-term recall: a search tool runs FTS5 over every message you have ever exchanged, dedupes hits by conversation, and returns snippets with a window of messages around each one, with no model calls anywhere in the path. Recall, in this design, is a database query rather than an embedding lookup.
-
-One small thing in the load path is worth stealing outright. The conversation load orders messages by their auto-incrementing row id, never by timestamp, and the comment explains why: `time.time()` is not monotonic. Sleep a laptop, step a clock with NTP, run under WSL, and a row written later can carry an earlier timestamp than the row before it. Sort by time and you can put an assistant's tool call *after* the tool's response, which is not a cosmetic problem. It is a malformed request the provider rejects.
-
-### Compaction is a flag flip, not a delete
-
-Now the question this chapter exists for. If compaction throws away messages so the model can keep going, how do you ever go back and see what actually happened?
-
-You do not throw them away. Compaction runs as one transaction that flips every live row to inactive, marks it as compacted, and inserts the summary and the surviving tail as new live rows. The session keeps the same id for its whole life. Nothing is deleted.
-
-```
-one write transaction:
-    mark every live row   active=0, compacted=1     # the old set, archived
-    insert the new set    active=1                  # summary + surviving tail
-    set message_count     to the new live count
-# same session id throughout. nothing is removed.
-```
-
-Two flags, and the pair is doing more work than one flag could:
-
-| `active` | `compacted` | what it means | model sees it | search finds it |
-|---|---|---|---|---|
-| 1 | 0 | live | yes | yes |
-| 0 | 1 | summarized away by compaction | no | **yes** |
-| 0 | 0 | rewound. The user took it back | no | no |
-
-That third row is the reason two flags beat one. "Gone from the model's view" and "gone because the user retracted it" are different facts, and only one of them should still be findable. A single `deleted` bit cannot express that.
-
-Here is the part I did not expect, and it is the reason the whole design is affordable rather than merely nice. The trigger that keeps the search index in sync fires `AFTER UPDATE OF content, tool_name, tool_calls`, only those columns. Flipping `active` and `compacted` touches none of them, so archiving ten thousand messages fires no index work at all. It is one cheap UPDATE. Had that trigger been written on the whole row, every compaction would have rewritten the index for the entire conversation, and the honest version of this design would have been unaffordable.
-
-### The database stores a different string than the model saw
-
-A detail that made me stop. A message row can hold two texts: the clean version a human reads, and a sidecar holding the exact bytes that were sent to the provider when those differed, because of an ephemeral memory injection, say.
-
-On replay the sidecar is substituted back in *verbatim*, with no sanitizing and no stripping, and the comment is explicit that cleaning it would reintroduce the divergence it exists to remove. The cache contract again: the bytes must match what the provider saw last time, and the only way to guarantee that is to keep them.
-
-The cost is a schema where "the message content" is genuinely ambiguous, and every export or display path has to decide which one it means.
-
-### Circuit-breaker state belongs on the row, not in the process
-
-Remember the anti-thrash breaker from the compaction chapter, two strikes and it stops trying. Where do those strikes live?
-
-On the session row, in columns, alongside the compaction failure cooldown and the fallback streak. There is one rehydration call that reloads all of them when a compressor binds to a session.
-
-The bug that forced this is worth memorising, because most harnesses still have it. With the counter in memory, a restart reset it to zero, so a session whose prompt was permanently over the threshold would compact once per restart, forever, and each restart looked like a fresh start to the guard. Their own comment describes exactly that.
-
-The rule generalises: any retry limiter, cooldown or thrash guard is broken until its counter outlives the process. And note the honest cost, a genuinely stuck session cannot be unstuck by restarting either. That is what a real breaker feels like.
-
-### The lesson hiding in micro-compaction
-
-This one is my favourite, because it is a trap that only shows up much later.
-
-Micro-compaction edits the message list *in memory* after a turn, folding an old exchange into a rolling summary. The persistence layer, meanwhile, is append-only: flushing a turn adds rows.
-
-Put those two facts together and you get a bomb. The splice never happened as far as the database is concerned, so the original rows are still live, and on resume the harness loads the summary *and* the messages it summarized, which is worse than never having compacted at all. The code says so, and it fixes it by calling the archive path explicitly after every splice. When that call fails, it logs that resume will double-load until the next full compaction: graceful, and honestly lossy.
-
-The general form: in-memory context editing and append-only persistence are not compatible by default. Every splice needs a matching archive write, or your resume path quietly reconstructs the conversation you were trying to shrink.
-
-### Two leases, and a hole worth knowing about
-
-Multiple processes can hold the same conversation, the desktop app, a CLI resume, the gateway, a background delivery. So there are two leases: one per session for compaction, and one per *conversation lineage* for taking a turn. The lineage matters, because a conversation that has rotated into segments is still one thing that should not be run twice at once.
-
-Both are re-validated inside the transaction that appends the message, which is the part to copy: a process that lost its lease during a long turn cannot land a row at the end of it.
-
-Then there is the gap. The lease check runs only *if a lease holder was supplied*, and at least one write path supplies none: the delivery mirror, which appends a message into a session so the receiving side has context. So a cron job delivering an overnight brief can append into your transcript while your own turn is in flight. I have not traced every caller, so treat that as what the code shows rather than a bug report. The rule is the sharp part: a fence enforced only when the caller opts in is not a fence.
-
-## The tool schema is built once, and that is a deliberate cost
-
-Third fault: the tool schema is re-sent on every iteration. You would expect the harness to assemble that list per request, asking each tool whether it is currently available.
-
-It does not. The list is computed once when the agent is constructed and never re-read from the registry. By now you can guess why, the tool block sits inside the cached prefix, so rebuilding it per request would invalidate the cache on every turn. Cheap freshness, expensive cache.
-
-The cost of that choice is a whole bug family: a tool that becomes available later is invisible. An MCP server that finishes its handshake after startup, or reconnects, has tools nobody can call. Their answer is one named rebuild function with four callers, the terminal UI's reload command, the gateway reload, a late-binding refresh thread, and a between-turns refresh, funnelled into one place, with a comment explaining that they had drifted apart before.
-
-### Availability checks, and the flake that amputated a toolbox
-
-Whether a tool makes it into that snapshot is decided by a per-tool predicate: does Docker answer, is the browser driver installed, is there an API key. The result is cached for thirty seconds.
-
-Here is the part worth teaching, and it took a production incident to arrive at. The cache is *asymmetric*. A success is cached normally. A failure arriving within a minute of the last success is thrown away, the tool stays available, and the next call re-probes.
-
-Why would you deliberately ignore a negative result from your own health check? Because the check is a subprocess with a timeout, and under load it flaps. A single Docker probe timing out used to strip the entire terminal and file toolset from whatever agent was being constructed at that instant, most visibly a freshly spawned child agent, which would then report that the file-reading tool does not exist. The tool had not gone anywhere. The probe had just been unlucky.
-
-So the design accepts a worse failure mode to avoid a much worse one. For up to a minute after a genuine outage, the model is offered a tool that will fail when called, which costs a wasted turn, rather than being silently handed a smaller toolbox, which costs a confused agent that cannot explain why its own capabilities vanished.
-
-### Dispatch: not parallel, not serial, segmented
-
-Now the mechanism I most enjoyed reading. The model emits several tool calls at once. Do you run them in parallel or in order?
-
-Neither, and the reframe is the lesson: this is a scheduling problem, so it gets a scheduler. The batch is walked in the order the model emitted it and cut into runs of calls that can safely overlap, separated by barriers that cannot.
-
-```
-for call in batch:                    # in the model's emission order
-    if call is interactive, unknown, or has unparseable args:
-        close the current run         # a barrier: nothing overlaps it
-    elif call touches paths:
-        if its scope cannot be determined:      close the run   # a barrier too
-        if it overlaps a reservation and either side is a writer:
-            close the run
-        reserve its paths as reader or writer
-        add to the current run
-    elif call is on the read-only list:
-        add to the current run
-run each segment in order; calls inside a run go concurrently
-results are reassembled in emission order, whatever finished first
-```
-
-The path reservation is what makes this safe, and the rule is one sentence from the source: concurrent reads of the same subtree commute, so reader against reader never conflicts, while a writer conflicts with any overlap. That is what stops the classic race where a model batches a file read alongside the patch it depends on, and the read lands first.
-
-Two details that show the thinking. A search tool reserves its *search root* as a reader, so a search batched after a write into that tree is ordered behind it. And a "parallel" run holding only one call is demoted to sequential, because there is no concurrency to win and the sequential path has richer handling.
-
-The price is visible: an allowlist of about a dozen read-only tool names maintained by hand, real path canonicalization on every scoped call, and enough concurrency machinery that they needed a gate to keep approval prompts appearing in the model's call order. That gate has a bounded wait, and when it expires it proceeds out of order on purpose. The comment is refreshingly plain about the trade: interleaved approval prompts are strictly better than permanent starvation.
-
-### Large output gets relocated, not truncated
-
-A single tool result can be enormous, a terminal dump, a large file, a web extraction. Three layers handle it: each tool caps its own output, then any result over about a hundred thousand characters is spilled, then if many medium results still add up past the per-turn budget, the largest are spilled until the total fits.
-
-Spilled means written to a file in the sandbox and replaced in the conversation with a preview of about fifteen hundred characters, the character count, the path, and an instruction to page it back in with offsets. Nothing is lost, and no model call is spent condensing it. Both budgets scale down with the model's context window, and never up.
-
-There is a wonderful pin in that config. The file-reading tool registers its own hundred-thousand-character cap, and the per-result layer overrides that one tool to infinity. It has to: the recovery instruction says *read the file*, so a capped reader would spill the recovery read to a new file and tell the model to read that one, forever. The moment your recovery path names a tool, that tool's own limits become a recursion hazard. Note that the pin only binds that layer; the per-turn sweep can still spill a large read under a synthetic name.
-
-One asymmetry to keep in mind if you ever debug this from a transcript: the display surfaces get the full tool output, because that copy is taken before the spill, while the model sees the preview. The plain terminal line truncates too, so a report that the agent "ignored" something it was obviously shown may be a report that the agent never saw it.
-
-### The floor is one they chose
-
-All of that machinery is measured against a threshold, and the threshold has to clear a floor no amount of compaction can move: the system prompt plus the tool schemas, sent in full on every request.
-
-Their reasoning for its size is good and written down. The core is described as a narrow waist with capability at the edges, the second of the two review lenses, and the stated reason is the right one: every tool they add is sent on every call, so the bar for a new core tool is high. A ladder pushes new capability toward a CLI command plus a skill, then service-gated tools, then plugins, with a core tool as the last resort. Most projects have nothing like it, and the always-available surface is the product: one agent that does the thing wherever you are talking to it, which you cannot ship with eight tools.
-
-And yet the list runs to fifty-nine, and their own comment budgets the resulting floor at twenty to thirty thousand tokens with fifty-plus tools. Under this harness's own economics that floor is cheap in money, since it sits ahead of every rewrite point and is re-read at a tenth of the price. What it costs is window, and therefore latency: it is why the compaction trigger has to be raised from half to three-quarters on models under a 512K window, and their comment says what happens otherwise, which is that the floor eats most of the reclaimed headroom, compaction re-fires every turn or two, and the session spends its wall clock summarizing.
-
-So what does this harness optimize for? Not input-token count, which it will let grow rather than rewrite history. It optimizes for the turn economics of a long-lived conversation, and specifically for the cached prefix. Not cost per successful task either, though the calibration loop and the breaker come closer than most, since both exist to stop it spending money on work that produces nothing. The gap is precise: these mechanisms catch wasted harness work rather than wasted task work. Nothing here notices that the agent got the answer wrong and is about to try again.
-
-I have made a version of this argument about [23 models that were an architecture problem in a modeling costume](/blog/one-model-instead-of-23); here the count is the price of the product promise, and none of the cache discipline reduces it.
-
-One more comment deserves the last word here. When a model emits a tool call with an empty name, which weak models do after reading tool-call syntax in a file and echoing it, the harness deliberately does not reply with the list of valid tools: sending the catalog feeds the imitation loop more names to mimic and inflates the context several times over across retries. A genuine typo still gets the catalog. Your error messages are part of the model's input distribution, and a helpful one can be the thing sustaining the failure.
-
-## The fourth fault: a tool call will delete your files if asked
-
-Every dangerous command goes through one function, and the order of its checks *is* the security design.
-
-Three things fire before any bypass is consulted: a hardline floor of unrecoverable commands, a guard against the model piping guessed passwords into `sudo`, and the user's own deny list. Only then does the code look at whether you turned approvals off. The comment is the clearest statement of intent in the file: opting into the trust-everything mode is trusting the agent with your files and services, not trusting it to wipe the disk or power off the box.
-
-Worth knowing what this costs before we go further. A human gate is a blocking wait, with a five-minute default timeout, and the harness had to build an accounting layer so that time parked on a person does not count against the deadline of a concurrent tool batch. Latency is the price of controllability, and here it is paid in whole minutes.
-
-The sudo guard deserves its own note, because it is a different *kind* of thinking. Piping a password to `sudo -S` when no password is configured is not a destructive command; it is the model brute-forcing, using the "Sorry, try again" output as an oracle and its iteration budget as the loop. The guard is not detecting damage. It is detecting that the agent is in a position to iterate against a feedback signal.
-
-### The one-line attack, and the fix that costs four comments
-
-Here is a security detail worth stealing outright, and you can see the attack yourself if I show you the wrong version first. Imagine the bypass check read the environment on every call:
-
-```
-# the tempting version
-on every check:   if env["BYPASS_APPROVALS"]: allow     # DON'T
-
-# what ships
-when code loads:  BYPASS = truthy(env["BYPASS_APPROVALS"])   # read once, frozen
-on every check:   if BYPASS: allow
-```
-
-The agent runs skills, plugins and generated code inside its own process. So with the first version, one line of injected Python setting that variable silently disables every approval check for the rest of the process. No prompt, no log, nothing to notice.
-
-That single change inverts the timing requirement. To enable the bypass you must set the variable *before the approval module is imported*, which is during process startup, before any model output exists. Model-generated code, by construction, runs after. The environment variable stops being a runtime switch and becomes a launch-time argument the model cannot reach.
-
-The cost is paid in plumbing, and honestly: because `--yolo` must now be materialized before tool discovery triggers that import, five launcher paths set it, most of them carrying a comment about the ordering, and one issue exists because a launcher was missed. There is a per-session toggle for runtime use that routes through an audited path instead.
-
-The general form is worth writing down: **security-relevant configuration read on the hot path is attacker-writable configuration**, whenever the attacker can run code in your process. Which, in an agent harness, they can.
-
-### The gate that trust cannot switch off
-
-Almost every guard here protects against damage. One protects against something else, and it is the idea I would take furthest.
-
-Writes to files that steer future behaviour, the agent instruction files a project loads on startup, always require human approval. Every time, one operation at a time, with no persistent grant, and **even when you have turned approvals off entirely**. It deliberately refuses to route through the shared approval gate, because that gate honours the bypass and allowlists, and the whole point is that this one does not.
-
-The reasoning: an injected instruction that edits those files outlives the turn and poisons every later session that reads them. Damage is bounded by a session. A rewritten instruction file is not.
-
-That distinction is why the same file also hard-blocks writes to the harness's own config, the file where "approvals: off" lives. Since the approval mode is re-read live on every check, a single successful write there would collapse the entire ladder on the next command.
-
-### What is not here: a sandbox
-
-Worth being plain, because it shapes everything above. Hermes installs no operating-system sandbox on the default path. No seatbelt profile, no Landlock, no namespaces, no seccomp; I looked for all of them, and the only hits are build and test tooling. The default terminal backend executes on your host.
-
-Container backends, remote backends and one opt-in runtime that hands the whole turn to another vendor's sandboxed subprocess all exist as options, so the isolation is borrowed rather than absent. And the trade is explicit in a way I have not seen elsewhere: when the backend *is* isolated, the approval layer is skipped entirely, including the hardline floor. `rm -rf /` inside a container with no host mounts is approved silently, and correctly. There is nothing there to lose. Docker with host paths mounted goes back through approvals, because now the command reaches your files.
-
-So isolation and approval are substitutes here rather than layers. Run isolated and the sandbox is the boundary; run on the host, which is the default, and the boundary is a pattern list plus your attention. There is no defence in depth on that path: a detection miss is a total miss.
-
-One more thing to carry away, from a pair of security advisories rather than a design doc. Session identity for approvals used to live in an environment variable, which is process-global, so with several sessions sharing a thread pool, one session's cleanup could clobber another's mid-run, dropping it onto the branch where no human is present and dangerous commands auto-approve. The fix was context-local identity. But context-local state does not cross a bare thread boundary either, so every place that fans out work had to be taught to carry it, which was the second advisory. The lesson is not "use contextvars". It is: when a security decision depends on ambient state, enumerate every boundary that state must cross, and make missing state mean *deny*.
-
-## Delegation: a child that starts empty
-
-Delegation is not on that list of four. It answers a fifth problem the loop cannot solve on its own: a task too large for one context. The answer is a child agent, and what it does *not* inherit is the design.
-
-A child gets a fresh conversation with none of the parent's history, its own task id, the parent's toolset minus a blocklist, and a focused prompt built from the delegated goal. The parent sees only the delegation call and the summary that comes back, never the child's intermediate tool calls or reasoning. That is the point: delegation is context isolation, and the parent pays a summary rather than a transcript.
-
-Five tools are stripped from every leaf child, which under the shipped spawn depth of one means every child, and each closes a distinct axis: no delegating (no fan-out amplification), no asking the user (nothing competes for one stdin), no memory writes (no racing on shared long-term state), no messaging (no side effects the parent cannot see), no scheduling (no work outliving the session in the parent's name). A child can never gain a tool the parent lacks. Raise the spawn depth and an orchestrator child gets delegation back, which is the one axis on that list you can re-open.
-
-The parent's summary budget is the detail I would copy: half of the parent's *remaining* context headroom, divided across the batch, floored so a single summary is never truncated to noise, and spilled to a file if it overflows. Ten children cannot collectively blow the window that the parent still has to think in.
-
-Two honest limits. The parent is told, in the tool description, that child summaries are self-reports rather than verified facts, if a child claims it uploaded a file, get a handle and check it yourself. And background delegation is durable in its *reporting*, not its execution: a completed result survives a crash and is delivered later, but a child in flight when the process exits is simply gone, and the parent learns only that the outcome is unknown.
-
-## Providers: the part of the abstraction that held, and the part that didn't
-
-Every request we have followed so far ends at a provider, and support for them is two layers. Thirty-odd providers are declared as *data*, a dataclass naming auth, endpoints, headers, catalog quirks, and four transports own the wire shapes: an OpenAI-style chat completion, Anthropic's messages, a responses-style envelope, and Bedrock. Adding a provider is somewhere between a dozen and forty lines of configuration. That layer worked.
-
-The layer that did not hold is failure. Provider *names* are checked over two hundred times inside the agent core. The single object that tracks turn recovery carries a one-shot flag per provider for credential refresh, plus more named after individual models' format bugs. Two of the six wire modes have no transport at all and are branched on directly in the loop.
-
-You could read that as sloppiness. I think it is the more interesting thing: **a provider's identity is not just how you call it, it is how it breaks.** Which of the three meanings a 429 has this time, your key is throttled, the whole endpoint is overloaded, or an aggregator's upstream is throttling, determines whether the right move is rotate the credential, back off on the same key, or switch models. That is not declarable. It is learned from a response body at runtime, and there is no slot in a config dataclass for it.
-
-So instead of hiding failures, they enumerated them. A classifier maps errors into a taxonomy that returns *recovery hints* rather than a label: is it retryable, should we compress, should we rotate the credential, should we fall back. The loop reads booleans and never re-classifies. Deterministic failures, a content-policy refusal, a bad certificate, a malformed model id, are explicitly marked non-retryable so they fail in one attempt instead of burning three.
-
-### The struct that makes cost accounting possible
-
-Here is a small design decision with an outsized payoff. Usage is normalized into four *disjoint* priced buckets, fresh input, output, cache reads and cache writes, and the familiar prompt-token total is computed from them rather than stored. Reasoning tokens ride along as a fifth count, but they are a breakdown of output rather than a peer of it, and nothing prices them.
-
-Providers disagree about this. Anthropic reports input exclusive of cache; the OpenAI and responses shapes report an inclusive total with a breakdown alongside. So the normalizer subtracts on the way in, and everything downstream sees parts that do not overlap.
-
-The payoff is that pricing multiplies each bucket by its own rate and double-charging a cached token is *structurally impossible*, not merely avoided. And the harness will refuse to produce a number it cannot defend: if usage has tokens in a bucket whose rate is unknown, the whole result comes back as unknown rather than as a partial sum, and every cost figure carries where its rate came from and when it was fetched.
-
-There is a lesson sitting next to it in the same repo. The transport layer defines its own usage struct, one that stores the provider's inclusive total plus a cached count, and nothing in production reads it. It cannot price a request correctly, so the real work happens elsewhere. That is what an abstraction drawn before its hardest requirement was understood looks like, and the tell is that it compiles, passes tests, and is dead.
-
-For completeness, since you may be waiting for it: there is no spend cap. There is a warning when you *select* an expensive model, and no mechanism that halts a run at a dollar figure. Unattended cron work has no financial stop.
-
-### Telemetry that cannot cost you anything
-
-The gateway and cron emit events through one queue with a contract stated as an invariant: the emit call must return in microseconds, must never block on disk or network, and must never raise into the caller. When the buffer is full it drops the *oldest* event and counts the drop, and a daemon thread fans out to subscribers that are individually isolated, so a slow collector cannot reach back into a turn.
-
-The privacy half is the part I would copy. The built-in events are not content-free by policy. They are content-free because the event types have no field a message could go in. Redaction runs anyway and fails closed: if the redactor cannot run, the string is replaced rather than emitted. Anything carrying conversation content lives in a separate opt-in plane.
-
-### What it does not measure
-
-The verification story is where I think this repo falls short of its own standards, and it is worth ending the tour on an honest note.
-
-There is an enormous unit suite, thousands of test files, and it is genuinely good at pinning mechanism: does this classifier return *overloaded* for this body, does that trigger fire at this threshold. There is also one agent-level eval, for the file-reading tool, and it is better than most published benchmarks: it runs the real agent against deliberately hostile fixtures, grades against planted ground truth, and ships rules of engagement that say single-run differences under three percent are noise and every measurement needs three repetitions.
-
-What does not exist is a harness-wide task suite. Trajectories are exported, but in a training format. This is a lab, and those traces feed model work rather than replay debugging.
-
-So the parts of this system I have spent nine chapters admiring are, precisely, the parts that unit tests and code review can see. A refactor that keeps every test green and makes the agent worse at multi-step work would ship undetected. That is not a small gap in a codebase this careful, and it is the fair counterweight to all of it.
-
-## Three things I have not seen elsewhere
-
-**It closes the loop on its own estimates.** Every harness guesses how large a request is. This one records the guess, pairs it with what the provider billed, corrects the next guess, and then asks afterwards whether the reduction it performed actually moved the number, and stops when the answer is no.
-
-**The component that built a message declares where its cacheable part ends.** Not a delimiter search, not a heuristic: a registry the builder writes at construction time, because only the builder knows, and a wrong guess silently poisons the cache it was meant to help.
-
-**A provider feature is treated as a written constraint with veto power.** "Prompt caching is sacred" is one of two lenses the guide says every change is reviewed against, and it holds in places that have nothing to do with caching: the interrupt path preserves byte-identical history, slash commands defer their effects to the next session, the two cheap context reducers ship disabled, and the persistence layer keeps a second copy of a message purely so the bytes replay identically.
-
-## The tradeoffs, in one place
-
-Those are the commitments this architecture makes. Here they are together, with what each one costs.
-
-| Commitment | What it buys | What it costs |
-|---|---|---|
-| A byte-stable prefix, enforced in review | Most of the bill on a long conversation | Features that would mutate history are off, deferred, or gated |
-| Reduction triggered and audited on billed usage | Fewer needless compactions, and a way to detect a floor no summary can fix | More durable state, and it degrades quietly where a provider reports no usage |
-| Both cheap reducers off by default | The prefix survives inside a burst of turns | The junk stays in context, and the expensive reducer runs sooner |
-| Approval-gated execution on the host, no sandbox | Full capability on your own machine | The boundary is a pattern list plus your attention |
-| A child agent with no inherited history | The parent's context stays small | The child needs everything spelled out, and reports a self-report |
-| Thousands of unit tests, no task-level benchmark | Mechanism is pinned precisely | Nothing detects a capability regression |
-
-## What I would take, and what I would leave
-
-Of everything above, the calibration loop is what I would take, without hesitation. Record your estimate before the call, pair it with the provider's reported usage when the response lands, fire your reduction on the corrected projection, then check the next real reading to see whether it helped. If you are still over, stop, your floor is the problem, and no schedule of summaries fixes a floor. It needs a number most provider APIs already return, and it degrades to the old behaviour where they do not.
-
-The trap I would put on a wall is **decorate last**. Cache markers must be applied after every other transformation of the transcript. Marking a message rewrites its content from a plain string into a list of blocks, so a later pass that type-checks for a string skips it silently, and a tool result ending in a newline then ships unstripped while it sits in the marked window, and stripped once it rolls out. Same message, different bytes, consecutive turns, prefix broken exactly where you meant to protect it. You find out weeks later from a sag in your cache hit rate, with no error anywhere. This harness gets the order right and explains it in a comment. If you build one, make it an assertion.
-
-What I would not take is the defaults. Remove the cache contract, a provider without a usable prefix cache, or an agent that is stateless per task, and those two zeros become the worst configuration on offer: no eviction, no amortization, one lossy summarization at the threshold. They are correct because of a constraint you may not share.
+This harness gets the order right and explains it in a comment. If you build a cache plan, make it an assertion.
 
 ## Where this leaves us
 
-So the rule I am keeping is narrower than the one I arrived with. Cheap context reduction never touches bytes the provider has already seen, and the next cheapest happens at a boundary you are already paying for: a compaction commit, or a cache expiry.
+The rule I am keeping is narrower than the one I arrived with. Cheap context reduction never touches bytes the provider has already seen, and the next cheapest happens at a boundary you were already paying for: a compaction commit, or a cache expiry.
 
-If you take one habit from this codebase, though, make it the comments. There is a genre of comment here that explains why the *obvious* fix is wrong and names the bug it caused, the non-atomic cache write that silently erased every learned context length, the reasoning-strip applied to the wrong list that corrupted stored conversations, the probe ladder that turned a user's million-token window into a quarter of it. Those record the shape of a failure, which is the thing a passing test cannot tell you.
+What stays open is where the rewriting happens at all. This harness already archives rather than deletes, so the durable record is append-only in the sense that matters. What gets rewritten is the outgoing request, and that is what all the gates and cooldowns and durable counters exist to protect. So why is the request assembled by editing history, rather than projected from it, so what the model sees can change without changing a byte of what the provider has seen?
 
-And the question I would put to the next harness comes from the shape of this one. Its durable record is already append-only in the sense that matters: a compaction archives rows rather than deleting them, and they stay searchable under the same session id. What gets rewritten is the outgoing request, and that is what every gate, cooldown and durable counter in this post exists to protect. So why is the request assembled by editing history at all, rather than projected from it, so that what the model sees can change without changing a byte of what the provider has already seen?
+If you want the rest of it, the loop and its budget, the tool layer, state, approvals, delegation and providers, that is [the component-by-component study](/blog/hermes-agent-internals).
 
 *I'm [Kaushal Prajapati](/about), a Staff AI/ML Engineer. [More posts](/blog), or say hi on [LinkedIn](https://www.linkedin.com/in/kforcode/).*
