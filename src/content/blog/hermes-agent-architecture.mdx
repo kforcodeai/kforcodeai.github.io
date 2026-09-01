@@ -251,7 +251,9 @@ Then it does the half nobody else does.
 
 After the next response arrives, it compares the billed count against the threshold and asks whether the prompt actually got under the line. Not whether the message list got shorter. Those two come apart, because of a floor compaction cannot touch: the system prompt plus the tool schemas, carried in full on every request. Their comment is the sentence I would put in front of anyone debugging a compaction loop. When that floor alone meets the threshold, "every pass shrinks messages by a healthy margin yet leaves the prompt over the line, so the next turn compacts again, forever."
 
-A reading still over the line records a strike. Two strikes stop compaction, and the counters live on the session row rather than in memory, so restarting the process does not hand the loop a fresh start.
+A reading still over the line records a strike. Two strikes stop compaction, and so does a summarizer that keeps falling back to deterministic dropping, since the first says reduction is not helping and the second says the summarizer is unhealthy. The counters live on the session row rather than in memory, so restarting the process does not hand the loop a fresh start.
+
+Nor is the stop permanent, which is the part that took a shipped bug to get right. A guard was tripped against the transcript as it looked at that moment, and conversations keep growing, so after five minutes of continuous block one probation probe is allowed. Fail that and it re-trips on the very next verdict, which bounds a genuinely incompressible session at one attempt per window.
 
 What I cannot tell from reading is how much the correction buys on a typical session, since nothing in the repo reports corrected triggers against raw ones. The mechanism is clearly right; the size of the win is their figure rather than mine.
 

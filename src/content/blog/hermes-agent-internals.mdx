@@ -216,16 +216,7 @@ Notice the small detail in the volatile tier: the date line records when the con
 
 A cache breakpoint is how you tell the provider where to save its work, and you get four per request. That is the entire budget, and everything interesting here is in the allocation.
 
-```
-# the default layout
-bp1 = end of the stable tier          # survives everything
-bp2 = end of the system prompt        # survives until a compaction
-bp3, bp4 = the last two cacheable messages   # move forward each turn
-
-# no static prefix available? fall back to
-bp1 = end of the system prompt
-bp2..bp4 = the last three cacheable messages
-```
+The default layout spends one on the end of the stable tier, which survives everything, one on the end of the system prompt, which survives until a compaction, and the remaining two on the last two cacheable messages, which move forward every turn. When there is no static prefix to split, it falls back to one on the system prompt and three on the recent tail.
 
 Two on the prompt, two riding at the end of the conversation. The two at the end are the working pair: each turn spends one save on the messages it just added, and every later turn reads them back at a tenth of the price. The two at the front are the insurance, and they are why a new session on the same machine can start warm.
 
@@ -415,7 +406,40 @@ A calibrated trigger tells you when to compact. It says nothing about whether co
 
 Note what it is not asking: whether the message list got shorter. Those two come apart, because of a floor compaction cannot touch, the system prompt plus the tool schemas that every request carries in full. Their comment is the sentence I would put in front of anyone debugging a compaction loop: when that floor alone meets the threshold, "every pass shrinks messages by a healthy margin yet leaves the prompt over the line, so the next turn compacts again, forever."
 
-A reading still over the line records a strike. Two strikes trip a breaker, and after five minutes one probe is allowed, with the counter dropped to a single strike so a bad probe re-trips at once. The counters are durable per session, and the clock arms on the first blocked evaluation rather than at trip time, so a process restarting into a tripped guard starts a full window blocked.
+The detail that makes this work is *where* the check lives, and the comment is explicit that it must not live in the obvious place.
+
+It would be natural to put it in the function that decides whether to compact. That function runs twice per turn, on two different measures: a rough preflight estimate before the request, and the provider's real count after it. And the rough one can dip below the threshold on its own, which would clear the strike and reopen the loop every single turn. So the verdict is judged only where the real post-response count is visible, which is the same place the calibration pair is re-anchored. Like compared with like, exactly once per compaction.
+
+Once per compaction is enforced by a latch. Committing a boundary arms it; adjudicating clears it. And if the next response arrives with no usage block at all, the latch is consumed anyway rather than left standing, so a reading that lands three turns later cannot be charged to a compaction it has nothing to do with.
+
+```
+# one boundary, exactly one verdict
+after a compaction commits:      verify_next_real_reading = True
+
+on a provider response:
+    if it reports no usage:      verify_next_real_reading = False   # not this one's verdict
+    elif verify_next_real_reading:
+        strikes = strikes + 1 if billed_prompt_tokens >= threshold else 0
+        verify_next_real_reading = False
+
+# checked before every compaction
+if strikes >= 2 or fallback_streak >= 2:
+    if no deadline yet:   deadline = now + 300s       # armed on first BLOCK, not at trip
+    elif now >= deadline: drop tripped counters to 1  # one probation probe
+    else:                 refuse to compact
+```
+
+Note the second condition on that guard. Two things can trip it independently: two ineffective verdicts, meaning compaction ran and the prompt stayed over the line, or two consecutive boundaries that fell back to deterministic dropping instead of a model summary. The first says reduction is not helping. The second says the summarizer itself is unhealthy. Both end in the same place, and keeping them as separate counters is what lets the log tell you which failure you have.
+
+There is a third case that deliberately counts as neither. When the compressible middle is too small to be worth a model call, the pass skips the summarizer and drops deterministically. That skip must not extend the fallback streak, because two skips would trip the breaker and disable compaction entirely, including the cheap deterministic dropping the skip existed to reach. It must not reset the streak either, since skipping proves nothing about the summarizer's health. So it is streak-neutral, and yet it still arms the effectiveness verdict on purpose: a skipped-summary drop that fails to clear the threshold is precisely the incompressible transcript the breaker exists to catch.
+
+Then there is the question of how the block ends, which the comment treats as a bug they had already shipped. A tripped guard was judged against the transcript as it existed at that moment, when the middle may have been too small to matter. Conversations keep growing. Without a way out, a session never auto-compacts again and rides into the provider's hard context limit.
+
+So the recovery is a probation probe. After five minutes of *continuous* block, the tripped counters drop to one strike and a single attempt is allowed. If that probe also fails to clear the threshold, the very next verdict re-trips the guard, which bounds the worst case in a genuinely incompressible session at one compaction attempt per recovery window. The drop is persisted, so sibling agents bound to the same session row unblock together rather than each discovering it separately.
+
+The clock is the part I would copy verbatim. The deadline is armed on the first *blocked* evaluation rather than at trip time, and measured on a monotonic clock. A fresh process that loads a durable tripped counter therefore starts a full window blocked instead of finding an expired deadline and immediately probing. Restarting cannot disarm the guard, which is the whole point of persisting it.
+
+Where it lives: two integer columns on the session row, both defaulting to zero, alongside the summary-failure cooldown. One bind call rehydrates all of them when a compressor attaches to a session.
 
 Be clear about what tripping buys and what it leaves. It ends the spending on passes that reclaim nothing. It leaves a session that can only grow toward the provider's hard limit. Read the breaker as a diagnosis rather than a repair: your floor is too big, and no schedule of summaries fixes a floor.
 
