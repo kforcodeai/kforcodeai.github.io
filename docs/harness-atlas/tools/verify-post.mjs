@@ -31,7 +31,17 @@ import { join, basename } from 'node:path';
  * for tells, citations in the body, or unattributed numbers.
  */
 const PROFILES = {
-	teardown: { words: [2200, 3400], h2: [6, 14], fences: 3, figures: [1, 3], tables: 2, variance: 0.30 },
+	// 2026-09-02: words 3400 -> 4600 and fences 3 -> 8, after the author rejected a draft
+	// written to the old caps as "extremely hard to follow... talks in riddles... doesn't
+	// teach or explain". Both caps were producing the same failure. A 3,400 ceiling on a
+	// post that has to define its own terms forces every explanation out and leaves the
+	// conclusions standing alone as aphorisms, which reads as literary rather than
+	// technical. A 3-block fence cap on a post ABOUT malformed model output forces the
+	// malformed output itself into prose paraphrase, which is what made it boring: the
+	// artifacts are the content. Explanation and evidence are not padding. The anti-padding
+	// job now sits on the reader-facing checks (no restatement, no uniform sections), not
+	// on a word count. If a post is dull at 4,600 it is dull for reasons a cap cannot fix.
+	teardown: { words: [2200, 4600], h2: [6, 16], fences: 8, figures: [1, 3], tables: 2, variance: 0.30 },
 	// A whole-harness study is bounded by the number of components it covers, not by
 	// an essay's attention budget: nine subsystems, each owed a mechanism, a design
 	// choice and a price. 10,000 is roughly where that stops being a study and starts
