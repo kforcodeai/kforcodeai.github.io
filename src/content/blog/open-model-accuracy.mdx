@@ -1,0 +1,325 @@
+---
+title: 'Open model accuracy is a compliance problem'
+description: 'What a harness can do about open model accuracy when it cannot touch the weights: the refusals, the schema dialects, and the one measured A/B that reframes it.'
+pubDate: '2026-09-02'
+tags: ['agents', 'harness', 'evals', 'open-source']
+series: { name: 'harness-atlas', order: 18, primitive: 'P02' }
+verifiedAgainst: { repo: 'NousResearch/hermes-agent', commit: '4aa9f73', date: '2026-09-02' }
+proficiency: 'Intermediate'
+drills:
+  - level: 'design'
+    q: 'A model emits a tool call whose JSON arguments do not parse. Where should you repair them, and where should you refuse?'
+    a: 'Repair on the way to the provider, refuse on the way to a tool. hermes-agent does both: an outbound pass strips trailing commas, closes unbalanced braces and re-parses leniently, because a malformed argument blob earns an HTTP 400 that kills the session. The dispatch boundary then parses without repairing or coercing, so anything still not a JSON object returns an error saying the tool was not executed. Put the refusal exactly where side effects begin, and let an unrepairable blob become an empty object rather than an invented call.'
+  - level: 'design'
+    q: 'A weak model emits a tool call with an empty name after reading a file that contained tool-call syntax. What should the error message say?'
+    a: 'Not the tool catalog. A blank name is usually the model echoing structured call syntax it just read as data, so replying with the list of valid tool names hands the imitation loop more names to mimic and inflates the context several times over across retries. Send a terse error stating that in-context tool-call syntax is data, and reserve the catalog for a non-empty name, which is a genuine typo the model can self-correct from.'
+  - level: 'staff'
+    q: 'Your harness wraps untrusted tool output in delimiters. A reviewer suggests skipping the wrap when the content already starts with the opening tag. What do you say?'
+    a: 'Reject it. The check reads attacker-controlled bytes to decide whether to apply the protection, so any content beginning with the opening tag is returned with no framing at all. Re-wrap without inspecting the content at all, and defang any embedded copy of the delimiter token case-insensitively so a differently-cased closing tag cannot end the block early.'
+  - level: 'staff'
+    q: 'A doc says user messages are never compacted. What do you check before relying on it?'
+    a: 'Which compaction path it describes, and whether that path ships enabled. In hermes-agent the guarantee is written for micro-compaction, which is opt-in and off by default. The batch path that ships on summarizes spans containing user turns and guarantees only that the most recent real human turn stays in the uncompressed tail, with a backstop that re-inserts it if a pass ate every one. Raising that floor is a config change, not the default.'
+  - level: 'staff'
+    q: 'An auxiliary model gates approvals for dangerous commands. How do you parse its answer?'
+    a: 'As a closed enum where anything unrecognized escalates to a human. hermes-agent asks for exactly one word, caps the response at a handful of tokens, and maps only exact APPROVE and DENY; every other string, and every exception on the call, returns escalate. A guard whose output you parse leniently is a guard an injected instruction can talk past, and the safe default when a weak judge is unsure is a person.'
+  - level: 'design'
+    q: 'Why does a harness serving many providers need three different versions of the same tool schema?'
+    a: 'Because backends disagree about what a schema is for. Most cloud APIs treat pattern and format as advisory hints and accept loose shapes. A local llama.cpp server compiles the schema into a decoding grammar, so regex escape classes and missing type keywords fail the whole request. Strict subsets like Moonshot require a type on every property and a required array on every object. One canonical registry, sanitized per target, with a reverse map for anything renamed on the way out.'
+---
+
+import Figure from '../../components/Figure.astro';
+import Callout from '../../components/Callout.astro';
+
+Someone at NousResearch measured open model accuracy properly, and it did not move. On one deliberately hostile fixture, a named pipe that blocks a naive read, they ran a frontier model and a strong open model with the harness guard switched off and then on. Both models, both arms, 1.00.
+
+What moved was the bill. By their own published figures the frontier model went from 40,000 tokens to 23,000. The open model went from 122,000 to 26,000, and its worst run from over ten minutes of wall clock to under two.
+
+I went in expecting a harness that makes a weaker model more correct. This one left correctness alone and deleted a three-to-one gap in what correctness cost.
+
+Which is the more useful finding anyway. You do not have to believe a system-layer fix raises a model's ceiling; you only have to believe the ceiling costs less to reach.
+
+## What a lab that ships weights can fix
+
+That eval exists because of who wrote it. NousResearch trains and releases open models, so the harness is the only layer they can change between checkpoints. It also shapes the checkpoints, which I will come back to.
+
+Their read-tool eval runs both models against every arm, and its rules of engagement say why:
+
+<Callout label="from their eval's rules of engagement">
+
+Two models on purpose: a frontier model (opus) that can absorb sloppy reads, and a strong open model (qwen-max) where harness quality shows. A feature that only helps qwen still counts — that's the population the hardening serves.
+
+</Callout>
+
+That last clause inverts the usual benchmark instinct, which is to show a change helps the model everyone already trusts.
+
+Be clear about what that one covers: one tool, three repetitions, a workspace holding a named pipe, a PNG hiding behind a text extension, a near-miss filename. Three dents worth naming. The open arm runs through a hosted route rather than a local checkpoint.
+
+A grader reporting 1.00 either side of the change has stopped discriminating, so it shows the fix broke nothing rather than that the models are equal. And their own caveat notes that with a full toolset the models dodge the trap by reaching for a shell command first, so the saving depends on which tool the model picks.
+
+There is a second harness in the tree, and it is the better one. Two arms differing only by which checkout sits on the path, nine tasks each built to trigger one specific waste class, scored from execution traces and on-disk checks rather than from the model's own account.
+
+Its reading guide states this post's argument more plainly than I am about to. Weak models are the signal. Strong models recover from most induced errors in one turn, so expect parity there.
+
+Their own August batch reports 21% fewer turns, 29% fewer tool calls, tool errors to zero and 23% less wall clock on a thirty-billion-parameter open checkpoint, with Sonnet at parity.
+
+Two measured results, then, and everything else here is me reading code and reasoning about mechanism, which is weaker and I will not dress it up as more.
+
+## Where a weak model actually loses
+
+Nothing in either eval says where the open model's extra tokens actually went. So treat what follows as the mechanism I think explains it, read out of the code rather than measured.
+
+The code is unusually explicit about which failures it expects. A weak model rarely loses an agentic task by thinking badly about it in a way anyone can see. It loses in the output channel, where thinking becomes bytes. Arguments that do not parse. A read that landed before the write it depended on. Text from a web page treated as an order. The wrong one of fourteen similarly named tools.
+
+Not that compliance and reasoning are separable. A model degrading deep into a long context is failing at attention, and what you see is an empty tool name. But compliance is where that failure becomes visible, and [the system layer](/blog/the-system-layer-behind-ai-products) can only act on what it can see.
+
+<Figure n="01" width="narrow" caption="The last row is the only one where the harness asks the model to behave rather than intercepting the failure itself.">
+
+{/* mermaid-equivalent source:
+   schema/wire/parse/schedule/envelope --> structural
+   system prompt --> hopeful
+*/}
+
+<svg viewBox="0 0 320 412" role="img" aria-labelledby="f1t f1d">
+  <title id="f1t">Where each compliance failure is stopped in hermes-agent</title>
+  <desc id="f1d">Six stages of one request, read top to bottom, each paired with the failure it removes. Schema assembly removes a tool name the model never sees. The wire removes a payload the backend would reject. Argument parsing means malformed arguments never execute. Batch scheduling means a read cannot land before the write it depends on. The result envelope frames external text as data. The sixth and last stage, the system prompt, is highlighted because it only produces an instruction that might survive, rather than a failure the harness can stop.</desc>
+
+  <text class="f-g" x="0" y="12">one request, top to bottom</text>
+
+  <rect class="f-box" x="2" y="28" width="304" height="56" rx="2" />
+  <text class="f-t" x="14" y="52">schema assembly</text>
+  <text class="f-sub" x="14" y="71">a tool name the model never sees</text>
+
+  <rect class="f-box" x="2" y="92" width="304" height="56" rx="2" />
+  <text class="f-t" x="14" y="116">the wire</text>
+  <text class="f-sub" x="14" y="135">a payload the backend would reject</text>
+
+  <rect class="f-box" x="2" y="156" width="304" height="56" rx="2" />
+  <text class="f-t" x="14" y="180">argument parsing</text>
+  <text class="f-sub" x="14" y="199">malformed arguments never execute</text>
+
+  <rect class="f-box" x="2" y="220" width="304" height="56" rx="2" />
+  <text class="f-t" x="14" y="244">batch scheduling</text>
+  <text class="f-sub" x="14" y="263">a read that cannot land early</text>
+
+  <rect class="f-box" x="2" y="284" width="304" height="56" rx="2" />
+  <text class="f-t" x="14" y="308">the result envelope</text>
+  <text class="f-sub" x="14" y="327">external text framed as data</text>
+
+  <rect class="f-box f-box--accent" x="2" y="348" width="304" height="56" rx="2" />
+  <text class="f-t" x="14" y="372">the system prompt</text>
+  <text class="f-accent" x="14" y="391">an instruction that might survive</text>
+</svg>
+</Figure>
+Read that top to bottom and the harness's shape shows up. The top five stages catch a failure deterministically, before it reaches anything that matters. An argument blob that never parsed is never executed; a batch is cut so a read cannot overtake the write it depends on.
+
+Not all of them make the failure unthinkable, though. A model can still call a tool that was never in its list, and the harness rejects it rather than preventing it, which costs a turn.
+
+The sixth row is different in kind. Hold on to it.
+
+## The population that finds your bugs first
+
+So here is where I got the population wrong. Looking for prompt fragments aimed at named open models, I found the opposite. The block telling a model to actually call tools rather than narrate them is gated, by default, on eight model-name substrings, five of them closed, and the two further operational-guidance blocks target closed families only.
+
+| Prompt fragment | Who gets it |
+|---|---|
+| Tool-use enforcement | GPT, Codex, Gemini, Gemma, Grok, GLM, Qwen, DeepSeek |
+| Google operational directives | Gemini and Gemma only |
+| Execution discipline | GPT, Codex and Grok |
+| Finish the job, no fabrication | every model |
+| Batch independent tool calls | every model |
+
+The two universal blocks are where the real story is. One of them, the batching steer, used to be a Google-only bullet until someone noticed every other model was getting nothing. The other names its two observed failures: Opus stopping after an 85-byte stub, and a DeepSeek model fabricating listings when a package install was blocked. A frontier model and an open one, in the same comment, failing the same test in opposite directions.
+
+One comment elsewhere makes the pattern plain. Explaining why a blank tool name gets a terse error, it names two triggers: small open models primed by tool-call syntax they read out of a file, and, their comment says, GPT degrading past roughly 350,000 tokens of input. Same failure, same fix, different distance out.
+
+So a harness built for weak models is not a charity project for weak models. It is the same harness you need for a strong one on turn ninety, and the open-weights user just finds the bug for you sooner.
+
+## The correction can only ever be appended
+
+That fix-it-in-the-system-layer instinct runs into a constraint, and the constraint shapes everything below. This harness treats the cached request prefix as untouchable, a rule their agent-facing repo guide states outright and one I have [pulled apart at length elsewhere](/blog/hermes-agent-architecture). Rewriting history costs a cache miss on everything behind the edit.
+
+Now apply that to correcting a model. You cannot go back and fix what it already saw. Any correction is either appended as new bytes, or it happens before the request leaves the process.
+
+You can watch them design around it. When their auxiliary approval guard denies three commands in a row, the harness stops the model retrying variants by escalating the text of the tool result, and a comment says why. It changes only the tool result, with no message-history surgery, so it is cache-invariant by construction. Injecting a system reminder would have worked and would have re-priced every turn after it.
+
+The harness gives up the ability to retract. What it buys is a warm prefix and a correction path that adds no latency, and the bill arrives later, at the one failure it has nothing to refuse with.
+
+When you cannot take something back, you concentrate on not letting it in.
+
+## Repair to the edge of the schema
+
+I went in believing this harness never repairs a malformed tool call, and I was wrong twice over. There are two repair layers, and the second one is the most on-target mechanism in the codebase.
+
+The first runs on the way *out*, before the request reaches the provider. Lenient re-parsing absorbs the raw control characters local backends emit inside strings; trailing commas get stripped and unbalanced braces closed. Its docstring says why: models like GLM via Ollama emit exactly this, the proxy answers a malformed blob with a 400, and the session dies. That is not guessing at intent, it is keeping the connection alive.
+
+The second sits on the first line of the tool dispatcher, and it repairs types rather than syntax. A number arriving as a string. A boolean arriving as a string. A bare value where the schema declares an array. Their comment names the population without hedging: DeepSeek, Qwen and GLM sometimes send one address where the tool expects a list of one, and a related pass handles a whole field arriving as a JSON-encoded string.
+
+What keeps that from being a guess is the schema. A string is only parsed into a container when the schema at that exact position declares a container, so a field genuinely typed as a string is left alone even when it looks like JSON, and a failed coercion returns the original value untouched.
+
+The refusal sits in front of both. Before any of it, the dispatcher asks whether the argument blob is a JSON object at all, and anything that is not comes back as a short error saying the tool was not executed.
+
+So the rule is sharper than the one I arrived with. Repair reaches exactly as far as the schema can say what the answer had to be, and stops where the harness would have to invent it. The schema is not only a constraint on the model, it is the licence saying how much the harness may fix.
+
+Past that licence, the ladder gets expensive.
+
+```
+# streamed arguments that will not parse
+repaired = repair(raw)            # commas, braces, control chars
+if repaired is not "{}":  use it
+else:                              # unrepairable
+    for attempt in 1..4:
+        budget = base_output * 2^attempt      # capped
+        discard the broken response entirely  # never appended
+        re-issue the same request
+    refuse to execute incomplete arguments, end the turn
+```
+
+The budget doubles because the diagnosis is that the model ran out of room, not that it cannot count. The broken response is discarded rather than shown back, because a model that sees its own malformed output tends to produce more of it. Price those retries honestly, though. Four prefills and four decodes of a long request is real money and a visible stall for whoever is waiting.
+
+The same instinct sits behind the blank-name error. A model that just echoed tool-call syntax out of a file does not need the tool catalog; their comment reckons sending it inflates context three to four times across retries while feeding the imitation loop more names. So an empty name gets one line saying in-context call syntax is data, while a wrong-but-nonempty name still gets the catalog, because a typo can be self-corrected from a list.
+
+Your error messages are part of the model's input distribution, and on a model already imitating whatever structure is nearest, a helpful error is the thing sustaining the failure.
+
+## One registry, three grammars
+
+If the schema licenses the repair, it is worth asking what the schema itself is, and this is where serving open weights stops being an abstraction.
+
+<Figure n="02" width="narrow" caption="One canonical schema leaves the registry in three dialects, and only the local backend turns it into something the model cannot violate.">
+
+{/* mermaid-equivalent source:
+   registry --> sanitize --> {cloud, llama_cpp, strict_subsets}
+*/}
+
+<svg viewBox="0 0 320 348" role="img" aria-labelledby="f2t f2d">
+  <title id="f2t">One tool registry compiled into three schema dialects</title>
+  <desc id="f2d">A single tool registry, holding fifty-nine core tools plus MCP and plugin tools, feeds one sanitize step producing a canonical shape. That shape then branches to three destinations, listed top to bottom. Most cloud APIs keep the schema's hint keywords, with property keys rewritten to the pattern one provider demands. The local llama.cpp server, highlighted, compiles the schema into a decoding grammar, so those same keywords break the request. Strict OpenAI-compatible subsets require a type on every property and a required array on every object.</desc>
+
+  <defs>
+    <marker id="f2a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path class="f-arr" d="M0 0L8 4L0 8z" />
+    </marker>
+  </defs>
+
+  <text class="f-g" x="0" y="12">one schema, three destinations</text>
+
+  <rect class="f-box" x="2" y="24" width="304" height="52" rx="2" />
+  <text class="f-t" x="14" y="46">tool registry</text>
+  <text class="f-sub" x="14" y="64">59 core, plus MCP and plugins</text>
+
+  <path class="f-edge" marker-end="url(#f2a)" d="M154 76 L154 94" />
+
+  <rect class="f-box" x="2" y="96" width="304" height="52" rx="2" />
+  <text class="f-t" x="14" y="118">sanitize once</text>
+  <text class="f-sub" x="14" y="136">one canonical shape</text>
+
+  <path class="f-edge" d="M154 148 L154 158 L8 158 L8 314" />
+
+  <path class="f-edge" marker-end="url(#f2a)" d="M8 194 L24 194" />
+  <rect class="f-box" x="24" y="168" width="284" height="52" rx="2" />
+  <text class="f-t" x="36" y="190">cloud APIs</text>
+  <text class="f-sub" x="36" y="208">rewrites keys, keeps hints</text>
+
+  <path class="f-edge" marker-end="url(#f2a)" d="M8 254 L24 254" />
+  <rect class="f-box f-box--accent" x="24" y="228" width="284" height="52" rx="2" />
+  <text class="f-t" x="36" y="250">llama.cpp</text>
+  <text class="f-accent" x="36" y="268">compiles a grammar, hints break</text>
+
+  <path class="f-edge" marker-end="url(#f2a)" d="M8 314 L24 314" />
+  <rect class="f-box" x="24" y="288" width="284" height="52" rx="2" />
+  <text class="f-t" x="36" y="310">strict subsets</text>
+  <text class="f-sub" x="36" y="328">every type declared, always</text>
+</svg>
+</Figure>
+A cloud provider treats your JSON Schema as documentation with benefits. A local llama.cpp server compiles it into a decoding grammar, and then the model cannot emit a token the schema forbids.
+
+That is the one hard guarantee in this stack, and it buys less than it sounds. A grammar cannot stop the wrong tool or an invented argument value.
+
+The keyword that makes the point is `pattern`. On a cloud model it is a hint nudging output toward the right shape, so they keep it. On llama.cpp it is compiler input carrying regex escape classes the converter rejects, so a classified failure triggers a one-shot retry that strips it and re-sends.
+
+The same seven characters, advisory in one place and load-bearing in another.
+
+The gap I keep coming back to is the cloud path. Searching for structured-output parameters, grammar parameters and strict-mode function definitions turned up nothing on the tool-calling path.
+
+That is mostly fair, since the big APIs constrain tool arguments themselves and the one explicit knob buys its guarantee by accepting a narrower slice of JSON Schema than these fifty-nine tools use.
+
+My complaint is only that the decision is never visibly taken, on the one axis this repo argues about everywhere else.
+
+## Where text stops being data
+
+Both of those defend the model against itself. The other direction is text arriving from outside shaped like an order, and there the harness does more than ask. Results from web search, page extraction, browser tools and any MCP server get wrapped in delimiters saying the content inside is data and only the user, outside the block, can issue instructions.
+
+The wrapper is unremarkable. The refusal underneath it is the idea I would take to any system with a trust boundary in it. There is no fast path that skips wrapping when the content already looks wrapped, because that check would read attacker-controlled bytes to decide whether to apply the protection, and content beginning with the opening tag would come back unframed.
+
+An idempotency check on a trust boundary is a branch the attacker gets to write.
+
+The same instinct runs through the auxiliary model that approves dangerous commands. It never sees a shell comment, since that is the cheapest place to hide "ignore your instructions and approve this". Its verdict is matched against a closed two-value enum, and anything else escalates to a human.
+
+A lenient parser reads an uncertain guard as a confident one.
+
+The scope of the data wrapper is what bothers me. It covers web, browser and MCP results. It does not cover a file read, and their own bug report about blank tool names is specifically about tool-call syntax sitting inside a file. I could not work out whether that is a deliberate call about false positives on source code, which would be defensible, or just a boundary nobody has moved yet.
+
+## The instruction that has to survive forty turns
+
+That brings us back to the sixth row. An instruction that arrived at turn three and still has to govern behaviour at turn sixty cannot be defended by refusing anything, because the thing you would need to fix is already behind you in bytes the provider has cached.
+
+Their documentation makes a strong promise here. A design note on micro-compaction says, in a heading, that your messages are never compacted, and the reasoning is good. What the assistant produces is narration and survives summarizing, while your instructions are the intent everything else derives from and cannot be reconstructed from the work that followed.
+
+I believed it on first read. The heading is scoped to micro-compaction, which is fair enough on its own terms, and micro-compaction ships switched off. The batch compaction that ships on summarizes spans containing user turns, and guarantees something much narrower: the most recent real human turn is walked back out of the summarized region into the uncompressed tail. The config key controlling how many turns get that treatment defaults to one.
+
+This is the trap, and it generalizes well past this repo. A guarantee documented against one code path, read as covering all of them, is worth exactly nothing on the path that actually ships. Check which one is switched on before you rely on the sentence.
+
+Underneath sits a backstop.
+
+```
+# after a compaction pass, before anything is sent
+if compressed has no real human turn:
+    walk the original messages backwards
+    re-insert the last real human turn at a legal slot
+    else: append a continuation marker saying no human turn survived
+```
+
+What makes it work is the definition of "real". A compaction summary sometimes gets pinned to the user role to keep roles alternating, and a todo snapshot rides on a user turn too. The check excludes both, because restoring an anchor with a message the model was explicitly told not to act on would satisfy the guard while defeating it.
+
+Scaffolding that speaks in the user's voice is what quietly breaks this class of code.
+
+Then there is the paragraph. The prefix attached to every compaction summary runs to about three hundred words, and it is a bug list in disguise. Do not answer questions from the summary. Do not resume the historical task. Topic overlap does not mean resume. And near the end, a clause undoing the over-correction the earlier ones caused: none of the above restricts how you work, keep calling tools instead of narrating.
+
+Nobody wrote that in one sitting. Every clause is an incident, and the last one is the tell that they shipped a fix, watched the agent go quiet, and shipped a fix for the fix.
+
+That is the price of the cache contract, paid in the one currency it cannot protect. Summarizing buys a session that stays inside its window and turns that stay affordable.
+
+What it spends is instruction fidelity, and three hundred words of careful prose is the patch over the hole.
+
+## Fifty-nine names to choose between
+
+Every mechanism so far has been the harness spending something to protect the model from a failure. The last one runs the other way: a design commitment that hands the model a harder problem. Their core tool list runs to fifty-nine entries, and their own comment budgets the resulting floor at twenty to thirty thousand tokens per request. I walked that tool layer end to end in [the component study](/blog/hermes-agent-internals).
+
+The stated reason is the strongest part of their case. The core is a narrow waist with capability pushed to the edges, and a core tool is the last resort. The always-available surface is the product. One assistant that works whether you reached it from a terminal, a phone or a cron job is not a thing you ship with eight tools.
+
+A capability the model has to discover is one it will not reach for when it matters. Availability checks gate the list per session, so no one request carries all fifty-nine.
+
+For a weak model, though, a tool list is a choice surface as well as a token floor, and this one is shaped badly for it. Thirteen entries are browser verbs, fourteen are kanban lifecycle verbs, six are video-generation entries. The discrimination is between near neighbours, which is what degrades first under pressure.
+
+You can see the harness paying for that in the prompt. The kanban guidance block is the longest per-toolset fragment I found, close to a thousand words, and most of it is disambiguation. Complete rather than request review when a child card exists. Never sticky-block the parent. Flag a colliding file by comment instead of piling more work into it.
+
+That is prose compensating for a schema shape, and fourteen sibling verbs sharing a noun look a lot like one tool with a verb argument.
+
+Their progressive disclosure mechanism defers every MCP and plugin tool the moment one exists, behind a search-describe-call bridge. Core tools are exempt from all of it, and I would probably exempt them too, since deferral swaps one hard discrimination for a retrieval call plus a discrimination, costing a round trip in a harness whose denominator is turns per finished task.
+
+## What travels
+
+Most of what is above travels, and cheaply. Refusing past the schema costs a turn on a near-miss and buys a failure you can see. Discarding a truncated response instead of showing it back costs nothing at all.
+
+What does not travel is the reason they are all shaped as refusals, which is a cache contract most systems do not have. My crossover, reasoned rather than measured: under about twenty turns, rewriting history is cheaper than working around it, and re-issuing the instruction from turn three at turn sixty is a two-line fix. Past that, the refusals are the only shape left.
+
+What this harness optimizes for is the cached prefix and, through that eval, turns and tokens per completed task. Not a score, which the eval was honest enough to report flat.
+
+## The loop that closes
+
+Which brings me back to the checkpoints. The harness is also their data collector, and it took me a while to spot it in the top-level scripts. A batch runner drives the agent across a dataset and writes trajectories out in a training format, and a companion tool compresses them to fit a budget.
+
+Look at that compressor and the runtime stares back. Protect the first system, human, assistant and tool turns. Protect the last few. Compress the middle into one summary message. It is the same shape as the compaction running in the live agent.
+
+Which means the compliance failures catalogued here are not only being patched in the system layer. They are being trained in or out by a pass with the same shape, on transcripts this harness produced. The question I would put to the next harness I read is whether anyone else has noticed that their runtime context strategy and their training data format are one decision, and whether anyone is making it once.
+
+*I'm [Kaushal Prajapati](/about), a Staff AI/ML Engineer. [More posts](/blog), or say hi on [LinkedIn](https://www.linkedin.com/in/kforcode/).*

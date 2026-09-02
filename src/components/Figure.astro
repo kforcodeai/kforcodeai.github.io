@@ -7,6 +7,9 @@
  * Three width modes, because `.prose > *` caps children at 45rem (~720px) and a
  * diagram that doesn't fit there reads as broken, not as scrollable:
  *
+ *   narrow   — a tall, small-canvas diagram. Caps the rendered width so a 320-unit
+ *              viewBox does not stretch to 2x in the prose column and paint 12px
+ *              labels at 25px. Author these at <= 480 units.
  *   default  — fits the prose measure. Author the viewBox at <= 660 units.
  *   wide     — breaks out to the page container (~1000 usable units on desktop),
  *              still centered on the prose column. For genuinely dense schematics.
@@ -26,7 +29,7 @@ interface Props {
 	/** Caption text — one sentence naming what to look at. */
 	caption: string;
 	/** Width mode. Default fits the prose measure; author wide diagrams as `wide`. */
-	width?: 'default' | 'wide' | 'full';
+	width?: 'narrow' | 'default' | 'wide' | 'full';
 }
 
 const { n, caption, width = 'default' } = Astro.props;
@@ -114,6 +117,15 @@ const id = `fig-${n}-${Math.random().toString(36).slice(2, 8)}`;
 		display: block;
 		width: 100%;
 		height: auto;
+	}
+
+	/* A small canvas in a 678px column scales ~2x and paints mono labels bigger than
+	   the h2 above them. Cap the stretch and centre the result; the empty gutters cost
+	   less than type that overpowers the prose. Still fills the column on a phone,
+	   which is where the narrow canvas was authored to render at ~1x. */
+	.ha-fig--narrow .ha-fig-scroll svg {
+		max-width: 480px;
+		margin-inline: auto;
 	}
 
 	/* Expand affordance — quiet until hover/focus. */

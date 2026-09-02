@@ -17,7 +17,10 @@ import { readFileSync } from 'node:fs';
 // `wide` bleeds symmetrically out of the prose column, but only as far as the
 // grid leaves room: ~864px at a 1200px viewport, ~1072px at 1440px. Budget the
 // narrower of those so a wide figure is not under-scaled on a laptop.
-const BUDGET = { default: 660, wide: 860, full: 860 };
+// `narrow` is for tall, small-canvas diagrams. Figure.astro caps their rendered width
+// at 480px so they do not scale ~2x in the prose column; authoring one wider than 480
+// units would defeat the cap and start shrinking text again.
+const BUDGET = { narrow: 480, default: 660, wide: 860, full: 860 };
 const MIN_FONT = 11;
 const MONO_ADVANCE = 0.6; // JetBrains Mono advance width per em, approx
 const MARGIN = 8;
