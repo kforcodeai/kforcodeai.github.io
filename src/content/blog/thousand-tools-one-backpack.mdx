@@ -1,6 +1,6 @@
 ---
 title: 'A thousand tools, one small backpack'
-description: 'Plug Codex, Claude Code, Hermes Agent, and DeepSeek Harness into the same 100-MCP, 50,000-tool company, hand them one incident, and watch what actually reaches the model. Explained with a backpack.'
+description: 'Put Codex, Claude Code, Hermes Agent, and DeepSeek-style Code Mode beside the same hypothetical 50,000-tool company and compare what actually reaches the model.'
 pubDate: '2026-09-09'
 tags: ['agents', 'harness', 'mcp', 'skills', 'context-engineering']
 series: { name: 'harness-atlas', order: 20, primitive: 'P04' }
@@ -8,8 +8,8 @@ verifiedAgainst: { repo: 'openai/codex', commit: 'ac192cd', date: '2026-09-09' }
 proficiency: 'Beginner'
 drills:
   - level: 'design'
-    q: 'Why is a tool schema more expensive than a message of the same length?'
-    a: 'A message is sent once and then becomes history. A tool schema in the tools array is re-sent on every request for the whole session, whether or not the tool is used. Ten thousand tokens of schema across a hundred turns is a million input tokens.'
+    q: 'Why is an eagerly exposed tool schema expensive over a long agent run?'
+    a: 'Direct tool definitions remain part of the repeated request surface whether or not the model uses them. A growing conversation is costly too, but stable history can be summarized, spilled, or continued by provider state; thousands of eager schemas also damage tool selection and must remain available as callable contracts.'
   - level: 'design'
     q: 'What are the two failure modes a harness sits between, and what does each look like in practice?'
     a: 'Invisible capability: schemas are hidden so well the model does not know GitHub exists and shells out to gh or invents an API. Context rot: everything is loaded, the right tool is buried in a 40k-token blob, the model picks a wrong neighbor, and later compaction destroys what was retrieved. Every mechanism in the post is a way to stay between them.'
@@ -17,20 +17,20 @@ drills:
     q: 'Registered, discovered, exposed, executed. Why treat these as four separate layers?'
     a: 'Because conflating them forces a choice between the two failure modes. A tool can be registered and executable without its schema being model-visible on this turn. Discovery is how the model moves a tool from registered to exposed, and execution can route through a bridge the model never sees. Keeping the layers separate is what lets 50,000 registered tools coexist with a 20-tool request.'
   - level: 'staff'
-    q: 'Codex and Claude Code both return a reference from tool search instead of injecting a new schema. Why does that matter for cost?'
-    a: 'Prompt caches key on an exact prefix. Injecting a discovered schema into the top-level tools array changes the system layer and invalidates every cached byte after it. A reference appended to the conversation suffix leaves the prefix byte-identical, so discovery costs one small suffix write instead of a full cache miss.'
+    q: 'How do Codex and Claude preserve a stable top-level tool prefix after search, and where do they differ?'
+    a: 'The studied Codex path appends a typed tool_search_output that can contain the matched full schema; Claude returns a compact tool_reference that the provider expands. Neither adds the match to later top-level tools arrays, so that prefix stays stable, but Codex still pays wire and history cost for the matched schema and Claude still sends its admitted deferred candidates in the API tools collection.'
   - level: 'staff'
     q: 'Hermes ends discovery with tool_call(name, args) instead of an exact native tool. What does that cost a small model?'
     a: 'A protocol state machine. After tool_describe the model must remember the operation id and its parameter shape across a generation boundary, then wrap them in a generic envelope. Frontier models do this reliably; a 20 to 30B open model has three more places to slip. Codex and Claude Code hand the model an exact tool to call instead, so the final decision is one function call.'
   - level: 'staff'
-    q: 'Hermes keeps a names-only listing inside its tool_search description even when it cannot afford descriptions. What does that buy?'
-    a: 'It guards against Failure A. A model that sees mcp_github_create_issue as a name knows a GitHub capability exists and can search for it. Deferral hides the schema, not the existence. The tiered budget of min(5% of context, 4000 tokens) is spent on visibility first.'
+    q: 'How does Hermes advertise a catalog that no longer fits as names plus descriptions?'
+    a: 'It degrades deterministically: names and descriptions, names only, mixed per-source detail, source summaries, and finally no flat listing while the search control remains. The budget is min(5% of context, 4000 tokens). This preserves boundedness, but at the largest scale individual capability visibility is no longer guaranteed.'
   - level: 'staff'
     q: 'DeepSeek Harness puts the skill catalog in a user-role reminder rather than the system prompt. What tradeoff is that?'
     a: 'The system prefix stays byte-stable when skills are added, removed, or reordered, which preserves prompt caching. The cost is authority: instructions in a user-role message carry slightly less weight than system-prompt text, and the catalog can be hidden by compaction until the next snapshot re-injects it.'
   - level: 'design'
     q: 'Why is Code Mode not the universal answer to hundreds of MCP tools?'
-    a: 'It needs a sandbox, it shifts work into code generation which weaker models do less reliably, intermediate results are invisible to the transcript, and there is no rollback if a generated script fails halfway. It is excellent when tools are composable APIs and the harness can run code; it is a poor fit otherwise.'
+    a: 'The generated SDK still contains the selected input and output signatures, so its prompt cost remains O(N) and the catalog must be narrowed first. It also shifts work into code generation, and a language runtime is not automatically a security sandbox. Code Mode is useful for bounded, read-heavy composition after isolation, policy, cancellation, and result-evidence checks pass.'
 ---
 
 import Figure from '../../components/Figure.astro';
@@ -40,11 +40,11 @@ Imagine you are going to school and you own a thousand tools. A hammer, a glue s
 
 Your backpack holds about twenty things.
 
-Every single morning you have to decide what goes in. Whatever you leave at home, you cannot use today. Whatever you bring, you carry all day, even if you never touch it. And the bus driver only lets you skip the security line if your bag looks *exactly* the same as yesterday.
+Every single morning you have to decide what goes in. Whatever you leave in the warehouse is not immediately available unless you carry a catalog and fetch it later. Whatever you put in the bag, you carry all day even if you never touch it. And the bus driver only lets you skip the security line if the front of your bag looks *exactly* the same as yesterday.
 
-That is the problem every coding agent harness hits once it grows up. This post plugs four of them into the same absurdly large company, hands each the same incident, and watches what reaches the model: [Codex](https://github.com/openai/codex), [Claude Code](https://code.claude.com/docs/en/how-claude-code-works), [Hermes Agent](https://github.com/NousResearch/hermes-agent), and [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
+That is the problem every coding agent harness hits once it grows up. This post places four approaches beside the same absurdly large company, hands each the same incident, and watches what reaches the model: [Codex](https://github.com/openai/codex), [Claude Code](https://code.claude.com/docs/en/how-claude-code-works), [Hermes Agent](https://github.com/NousResearch/hermes-agent), and [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
 
-The question is never "can the harness connect to 100 MCP servers?" All four can. The question is:
+The company and counts below are a **capacity thought experiment**, not measured production cardinalities or a benchmark. A harness can have a huge registered universe; the question is:
 
 <Callout label="the real question">
 Of the 50,000 things the agent *could* do, what does the model actually **see** on this turn, and how does it **find** the one thing it needs?
@@ -54,11 +54,11 @@ Of the 50,000 things the agent *could* do, what does the model actually **see** 
 
 A language model sees exactly one thing: this request. The request has three compartments.
 
-- **The system prompt.** Who you are, how to behave. Small, fixed.
+- **The system prompt.** Who you are, how to behave. Ideally small and stable.
 - **The tool schemas.** A JSON description of every tool the model may call. Name, description, parameters.
 - **The messages.** The conversation so far, including every tool result.
 
-Here is the part kids and engineers both miss the first time. A message is sent once and then it is history. A tool schema is sent **every turn**, for the whole session, whether the tool gets used or not. It is a permanent tax.
+Here is the part kids and engineers both miss the first time. Conversation history grows as a suffix and can later be compacted, spilled, or represented by provider continuation state. An eagerly exposed tool schema remains in the callable request surface **every turn**, whether the tool gets used or not. It is a recurring tax.
 
 <Figure n="01" caption="Everything in the tools compartment is re-sent on every request, and the cache only helps while the front of the bag is byte-identical to last time.">
 
@@ -71,7 +71,7 @@ Here is the part kids and engineers both miss the first time. A message is sent 
 
 <svg viewBox="0 0 656 300" role="img" aria-labelledby="tb1t tb1d">
   <title id="tb1t">One request as a backpack with three compartments</title>
-  <desc id="tb1d">A wide box represents one API request. Inside it, three stacked compartments: a small system prompt, a large tool-schemas compartment labelled re-sent every turn, and a messages compartment labelled append-only. A dashed line marks the cache boundary between the stable prefix and the changing suffix. Below, a note reads that agents run about a hundred to one input to output and a cache miss on the prefix is the bill.</desc>
+  <desc id="tb1d">A wide box represents one API request. Inside it, three stacked compartments: a small system prompt, a large tool-schemas compartment labelled re-sent every turn, and a messages compartment labelled growing history. A dashed line marks the cache boundary between the stable prefix and the changing suffix.</desc>
 
   <defs>
     <marker id="tb1a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -85,31 +85,27 @@ Here is the part kids and engineers both miss the first time. A message is sent 
 
   <rect class="f-box" x="16" y="46" width="600" height="40" rx="2" />
   <text class="f-t" x="30" y="70">system prompt</text>
-  <text class="f-sub" x="330" y="70">small · fixed · who you are</text>
+  <text class="f-sub" x="330" y="70">small · stable · who you are</text>
 
   <rect class="f-box f-box--accent" x="16" y="96" width="600" height="72" rx="2" />
   <text class="f-t" x="30" y="120">tool schemas</text>
   <text class="f-accent" x="330" y="120">re-sent every turn, used or not</text>
   <text class="f-sub" x="30" y="142">read_file · grep · bash · mcp__github__* · mcp__slack__* · …</text>
-  <text class="f-sub" x="30" y="158">tens of tools fine · hundreds fatal · Cloudflare MCP names alone ≈ 32k tokens</text>
+  <text class="f-sub" x="30" y="158">a large eager catalog consumes context and weakens tool selection</text>
 
   <rect class="f-box" x="16" y="178" width="600" height="48" rx="2" />
   <text class="f-t" x="30" y="202">messages</text>
-  <text class="f-sub" x="330" y="202">append-only · tool results land here</text>
+  <text class="f-sub" x="330" y="202">growing history · tool results land here</text>
 
   <path class="f-div f-dash" d="M16 236 L616 236" />
   <text class="f-sub" x="16" y="256">↑ stable prefix — cached if byte-identical</text>
   <text class="f-sub" x="392" y="256">changing suffix — paid fresh ↑</text>
 
-  <text class="f-accent" x="0" y="290">agents run ≈100:1 input:output. a cache miss on the prefix is the bill.</text>
+  <text class="f-accent" x="0" y="290">stable prefixes help caching; bounded tool surfaces help both cost and accuracy.</text>
 </svg>
 </Figure>
 
-Two more facts make it worse.
-
-**Agents talk about a hundred input tokens for every output token.** Nearly the whole bill is what you *send*, not what the model says back.
-
-**Prompt caching only works on an exact prefix.** If the first ten thousand tokens of this request are byte-identical to the last one, the provider charges a fraction for them. Change one tool description in the middle and everything after it is paid at full price again.
+Two more facts make it worse. Agent runs are input-heavy because instructions, tool definitions, and retained history accompany many generations. And provider prompt caches reward stable prefixes: changing a tool definition can move the reusable boundary and force more input to be processed again. Exact cache accounting varies by provider, but the design pressure is the same.
 
 So the question is not "can we fit a thousand tools?" It is "how do we own a thousand tools and carry twenty, without forgetting the other nine hundred and eighty exist?"
 
@@ -125,19 +121,7 @@ You leave so much at home that you forget you own it. The model never sees that 
 You bring everything. The right tool is in there somewhere, buried in forty thousand tokens of schema. The model attends to the wrong neighbor, the conversation fills up with tool dumps, and when the harness later compacts history it destroys the facts you paid to retrieve. This is **context rot**.
 </Callout>
 
-The evidence for how bad each side gets is not folklore. A harness study I did across a dozen open harnesses collected these:
-
-| What was measured | Result |
-|---|---|
-| Cloudflare MCP alone, about 3,300 tools | Names-only listing is already about 32k tokens |
-| Core Hermes toolset, 59 tools | 20 to 30k tokens of schema, every call, incompressible |
-| Compaction of in-context facts | Up to 60% of facts destroyed, 54% behavioral drift |
-| Curated skills vs. sprawling set in Claude Code | 82% task success vs. 9% |
-| Anthropic tool search on Opus 4 | 49% success without, 74% with, still 26 points of retrieval failure |
-| Agents writing code against MCP instead of calling tools one by one | Up to 98.7% token reduction |
-| Azure SRE Agent: 100+ bespoke tools replaced by a filesystem | "Intent met" rose from 45% to 75% |
-
-Read the last three together. Search helps a lot and is not enough. Collapsing many tools into one general one helps enormously. And "fewer, better" beats "more" every time it has been measured.
+The harness studies behind this article establish the mechanisms below, not universal success rates at 50,000 tools. Search makes selection possible; it does not prove that a given model will retrieve the right operation. Large-catalog recall, first-call argument validity, payload size, cache behavior, and end-to-end task success still need model- and provider-specific evaluation.
 
 ## Five things that look the same and are not
 
@@ -172,7 +156,7 @@ And a plugin is not one tool either. An "Engineering Operations" plugin might ad
 
 ## Meet the monster company
 
-Now let's build the environment we will plug all four harnesses into. Deliberately absurd, and not that far from a real enterprise install.
+Now let's build the hypothetical environment we will use to compare the four approaches. It is deliberately oversized so the architectural limits are impossible to ignore.
 
 ```text
 Agent installation
@@ -218,27 +202,27 @@ ClickUp MCP                      (create the incident)
 Slack MCP                        (post the summary)
 ```
 
-Seven capability sources. Five of them are MCP servers with hundreds of operations each. The agent needs about one operation from each. Watch how each harness gets from 50,000 to about six.
+Seven capability sources. Five of them are MCP servers with hundreds of operations each. The agent needs about one operation from each. The comparison starts with a 50,000-tool registry, but not every provider can admit that whole registry into one request; some need preselection or partitioning first.
 
-## The shared trick: a library card, not the book
+## The shared principle: the warehouse is not the backpack
 
-All four converge on one idea, and it is the idea a librarian would give a seven-year-old.
+All four separate the **registered universe** from the **surface the model must reason over**. They do not, however, use the same wire protocol or pay the same remaining cost.
 
-You do not carry the books. You carry the **card catalog**. A card is tiny: a name and one line about what the book is for. When you need the book, you look up the card, walk to the shelf, and bring back just that book. And you bring it back as a *new thing you picked up*, not by rewriting the front of your bag.
+The useful ideal is a **card catalog**: keep compact routing hints, find the relevant item, and activate only what the task needs. Codex can append a typed schema-bearing load item. Claude keeps an admitted deferred subset on the wire and returns a compact reference. Hermes returns metadata and later a schema in ordinary tool history. DeepSeek-style Code Mode has no equivalent search primitive in the studied path: it describes every already-selected tool in a generated SDK.
 
-<Figure n="02" caption="The index is cheap and always present. The body arrives late, as a tool result in the conversation suffix, so the cached prefix never changes.">
+<Figure n="02" caption="The metadata-first ideal: keep the stable surface small, then append a typed activation item or a skill body. Exact wire layouts differ by provider.">
 
 {/* mermaid-equivalent source:
    prefix[stable prefix: system + core tools + index cards]
    model --> search(query)
-   search --> result[reference or body, lands in suffix]
+   search --> result[typed activation or body, lands in suffix]
    result --> call
    prefix stays byte-identical
 */}
 
 <svg viewBox="0 0 656 330" role="img" aria-labelledby="tb2t tb2d">
-  <title id="tb2t">Card catalog: index in the prefix, body in the suffix</title>
-  <desc id="tb2d">Left column is the stable prefix: system prompt, a few eager core tools, and a compact index of names with one-line descriptions. The model reads the index, issues a search, and the result arrives as a tool result in the conversation suffix on the right. From there the model calls the discovered tool or reads the loaded skill body. A label states that the prefix stays byte-identical throughout.</desc>
+  <title id="tb2t">Card catalog: compact routing hints and late activation</title>
+  <desc id="tb2d">Left column is the stable prefix: system prompt, a few eager core tools, and compact routing hints where the harness supports them. The model searches and a typed activation item or skill body arrives in structured history on the right. The exact item may be a schema-bearing Codex output, a Claude reference, Hermes metadata, or a loaded skill body.</desc>
 
   <defs>
     <marker id="tb2a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -250,7 +234,7 @@ You do not carry the books. You carry the **card catalog**. A card is tiny: a na
   </defs>
 
   <text class="f-g" x="0" y="16">stable prefix (cached)</text>
-  <text class="f-g" x="360" y="16">conversation suffix (grows)</text>
+  <text class="f-g" x="360" y="16">structured history (grows)</text>
 
   <rect class="f-box--ghost" x="0" y="28" width="300" height="290" rx="2" />
   <rect class="f-box--ghost" x="360" y="28" width="272" height="290" rx="2" />
@@ -276,8 +260,8 @@ You do not carry the books. You carry the **card catalog**. A card is tiny: a na
   <text class="f-accent" x="296" y="110">search</text>
 
   <rect class="f-box" x="374" y="82" width="244" height="50" rx="2" />
-  <text class="f-t" x="386" y="102">tool result: reference</text>
-  <text class="f-sub" x="386" y="120">k8s.get_rollout_history, or SKILL.md</text>
+  <text class="f-t" x="386" y="102">typed activation / body</text>
+  <text class="f-sub" x="386" y="120">schema, reference, metadata, or SKILL.md</text>
 
   <path class="f-edge" marker-end="url(#tb2a)" d="M496 132 L496 156" />
 
@@ -288,8 +272,8 @@ You do not carry the books. You carry the **card catalog**. A card is tiny: a na
   <path class="f-edge" marker-end="url(#tb2a)" d="M496 210 L496 234" />
 
   <rect class="f-box" x="374" y="238" width="244" height="50" rx="2" />
-  <text class="f-t" x="386" y="258">reference stays in history</text>
-  <text class="f-sub" x="386" y="276">no second search next turn</text>
+  <text class="f-t" x="386" y="258">activation stays in history</text>
+  <text class="f-sub" x="386" y="276">reusable while provider state survives</text>
 
   <text class="f-accent" x="14" y="314">prefix byte-identical → cache hit</text>
 </svg>
@@ -315,7 +299,7 @@ Let us run the incident through each.
 
 ## Codex: registered is not exposed
 
-Codex starts with one correct abstraction. Every registered tool has an **exposure**: `DIRECT`, `DEFERRED`, or `CODE_MODE`, and they can combine. A tool being *available* is a separate fact from a tool being *paid for on every request*. Runtime dispatch stays registered even when the schema is not model-visible.
+Codex starts with one useful abstraction. Registered tools can be exposed as `DIRECT`, `DEFERRED`, or `CODE_MODE`, and those modes can combine. A tool being *available* is a separate fact from its schema being *model-visible on this turn*. Runtime dispatch stays registered even when the schema is deferred.
 
 Here is what the first request looks like in our monster company:
 
@@ -336,9 +320,9 @@ NOT PRESENT              ❌ 50,000 MCP schemas
 
 **Deferred** is where MCP and app tools go when the model and provider support it. The first request carries a `tool_search` tool but none of the deferred schemas. When the model searches, Codex runs an in-memory BM25 index over tool names, namespaces, descriptions, parameter names, and nested schema descriptions. Underscores become spaces so `get_rollout_history` matches "rollout history".
 
-Now the clever part. What the search returns is not a new schema pasted into the tools array. It is a **namespace reference** with `defer_loading: true`, and it lives in the conversation as a search-output item. The integration test in the repo checks all four steps: the first request has no calendar schema, the search result records only the matching namespace, later requests still do not add it to the top-level tools, and the model calls the namespaced function anyway by relying on the persisted search output.
+Now the important precision. Search does not paste a new definition into the top-level `tools` array, but the studied client-search path does return a typed `tool_search_output` containing the matched namespace and **full function schema** with `defer_loading: true`. The integration test checks the sequence: request one has no deferred Calendar schema; Codex runs BM25 locally; request two carries the matched schema inside structured history; later top-level `tools` arrays remain unchanged; and the provider emits the namespaced exact call.
 
-In backpack terms: the librarian hands you a slip with the shelf number. You go and use the book. The front of your bag never changes. That is why it is cache-friendly and a client-side "search, describe, inject a new schema" bridge is not.
+In backpack terms: the librarian hands you the exact relevant page in a protocol envelope instead of repacking the front pocket. The stable tool prefix is the saving. This does **not** mean zero post-search context, history, or wire cost: the matched schema can still cross the wire in that typed item.
 
 For visibility, deferred namespaces still get a cheap advertisement: a name and the first line of description, under a 4 KiB total budget and 250 characters per namespace, with incremental add and remove diffs after the first snapshot. MCP server `instructions` become routing hints, which is why the official guidance says to make the first 512 characters self-contained.
 
@@ -355,18 +339,18 @@ MODEL  git log · read deployment config · grep "VoiceAI"
                                           ← DIRECT tools, no discovery
 
 MODEL  tool_search("kubernetes deployment rollout pods")
-       → reference: kubernetes.get_rollout_history, kubernetes.list_pods
+       → typed load item: kubernetes.get_rollout_history, kubernetes.list_pods
        kubernetes.get_rollout_history({namespace:"prod", deployment:"voice-ai"})
 
 MODEL  tool_search("production error rate 429 metrics")
-       → reference: datadog.query_metrics, datadog.query_logs
+       → typed load item: datadog.query_metrics, datadog.query_logs
        datadog.query_logs({...})
 
 MODEL  tool_search("create ClickUp task")     → clickup.create_task(...)
 MODEL  tool_search("post slack channel message") → slack.post_message(...)
 ```
 
-Four searches, four references, four exact calls. The stable prefix never changed. Fifty thousand tools were registered; about six were ever visible.
+Four searches, four typed matches, four exact calls. The top-level tool prefix never changed. Fifty thousand tools were registered; only the matches entered the model's effective tool context.
 
 **Skills** get a bounded catalog rather than a search. Each visible skill renders as a name, a routing description, and a locator, which is a filesystem path or a resource id. The budget is 2% of the context window when known, else 8,000 characters, capped at 10,000 tokens, with 1,024 characters per description. When the catalog does not fit, Codex keeps every name-and-locator line first and hands out remaining description characters round-robin. If even the names do not fit, tail entries drop and a warning fires.
 
@@ -380,15 +364,15 @@ Where Codex still falls down: on a provider that cannot represent namespaced sea
 
 Claude Code lands in the same place as Codex with a slightly different route, because it can lean on the Anthropic API directly.
 
-On supported models, MCP tools are **deferred by default**. At session start the model sees tool names and server instructions, each truncated at 2 KiB. Schemas load when a `ToolSearch` call finds them. The protocol underneath:
+On supported models, MCP tools are **deferred by default**. At session start the model sees bounded routing guidance rather than every full schema. Schemas load when a `ToolSearch` call finds them. The protocol underneath:
 
-1. All candidate definitions stay in the API `tools` request with `defer_loading: true`.
+1. Admitted candidate definitions stay in the API `tools` request with `defer_loading: true`.
 2. Deferred definitions are excluded from the model's system-prompt prefix.
 3. `ToolSearch` returns `tool_reference` blocks for matches.
 4. The API expands those references for the model.
 5. The search result stays in history, so the tool can be reused later without another search.
 
-Same shape as Codex: discovery appends to the suffix, the prefix stays warm. One nuance worth naming. Because the deferred definitions still travel in the API request, this is primarily a **model-context** win, not necessarily a wire-bytes win. Those are two different costs:
+The result resembles Codex at a distance, but its wire shape is different. Because Claude's admitted deferred definitions still travel in the API request, this is primarily a **model-context and prompt-prefix** win, not a wire-bytes win. Those are two different costs:
 
 ```text
 bytes serialized over the wire   ≠   tokens the model attends to
@@ -396,14 +380,16 @@ bytes serialized over the wire   ≠   tokens the model attends to
 
 Claude Code's deferral is strong at the second, which is the one that decides both accuracy and the bill.
 
-The API supports regex and BM25 variants, up to 10,000 deferred definitions, and returns five matches by default. The public docs do not say which ranking the runtime uses, so the honest claim is the protocol, not the algorithm.
+The native API accepts at most **10,000 deferred definitions in one request**, and request bytes may become the binding constraint earlier. A 50,000-tool authorized universe therefore has to be prefiltered or partitioned before Claude's `ToolSearch` can search it. The public docs do not establish the proprietary runtime's exact ranking algorithm, so the honest claim is the protocol, not a particular ranker.
 
 ### Claude Code runs the incident
 
 ```text
-tools on turn 1 = [ Read, Edit, Bash, Glob, Grep, …, ToolSearch ]
-                  + names & server instructions for 100 MCP servers
-                  ❌ not 50,000 schemas
+registered universe = 50,000 tools
+request projection  = authorized, ranked/partitioned subset (≤10,000; often fewer)
+tools on the wire    = [ Read, Edit, Bash, Glob, Grep, …, ToolSearch ]
+                     + admitted definitions marked defer_loading
+model's first view   = eager tools + search + bounded routing guidance
 
 MODEL  skill catalog → incident-response → SKILL.md injected as one message
 MODEL  Read · Grep · Bash(git log)            ← core, eager
@@ -416,7 +402,7 @@ MODEL  ToolSearch("create ClickUp task")  → mcp__clickup__create_task
 MODEL  ToolSearch("post Slack message")   → mcp__slack__post_message
 ```
 
-Three turns later, when the agent wants Datadog metrics again, it does not search again. The reference is already in history.
+Three turns later, the retained Datadog reference can be reused without another search. That is an optimization, not durable capability truth: compaction, failover, or lost continuation state may require reconstructing provider state from separately persisted capability IDs, revisions, and digests.
 
 What Claude Code adds is **operational dials**. The `ENABLE_TOOL_SEARCH=auto` setting loads everything eagerly while total schemas are under 10% of the window and defers at or above it. You can set a custom percentage, turn it off, or mark a small hot server `alwaysLoad` so three to five universal tools stay direct while the long tail defers. A non-first-party base URL disables search by default because many proxies drop reference blocks.
 
@@ -437,35 +423,35 @@ So Hermes builds its own **portable protocol** out of plain functions, and state
 1. Per-conversation prompt caching is sacred.
 2. The core is a narrow waist. Every core tool is paid on every API call.
 
-The core is 59 tools, and they are **never deferred**: terminal, file read and write, patch, search, todo, memory, browser, web search, code execution, delegation. Optional tools can carry a `check_fn` that omits them from the schema until a prerequisite exists, such as a token or a platform. Zero footprint otherwise.
+The studied tree contains a broad set of roughly 59 core tools. Core tools are normally eager, but explicit and default defer sets take precedence—`session_search` and `todo_list`, for example, are default-deferred in the studied source. Optional tools can also carry a `check_fn` that omits them from the schema until a prerequisite exists, such as a token or a platform. Zero footprint otherwise.
 
 At startup Hermes connects to each MCP server, calls `list_tools()`, and registers everything under prefixed names like `mcp_github_create_issue`, so five servers that each have a `search` tool do not collide. In our company that is about 50,000 registrations. None of their schemas go on the wire. Instead the model sees three bridge tools:
 
 ```text
 HERMES MODEL SEES
 
-core tools (59)      terminal · read_file · patch · web_search · …
+normally eager core  terminal · read_file · patch · web_search · …
 bridge tools (3)     tool_search · tool_describe · tool_call
 
 behind the curtain   50,000 deferred tools
 ```
 
-Any model that can call a function can use those three. That is the portability bet.
+Any ordinary function-calling provider can represent those three. Whether a particular model follows the search–describe–call protocol reliably is still an evaluation question. That is the portability bet and its cost.
 
-The piece I want you to copy is how Hermes keeps the 50,000 **visible** without paying for them. Inside the `tool_search` description, under a budget of `min(5% of context, 4,000 tokens)`, it tries three tiers in order:
+The piece worth copying is how Hermes keeps advertisement **bounded**. Inside the `tool_search` description, under a budget of `min(5% of context, 4,000 tokens)`, it degrades from names plus descriptions to names only, mixed per-source detail, source summaries, and finally no flat listing while the search control remains:
 
-<Figure n="03" width="default" caption="Hermes spends its visibility budget on existence first: full descriptions if they fit, then names only, then one line per server. Names are never deleted.">
+<Figure n="03" width="default" caption="Hermes degrades its bounded advertisement from detailed entries to names, then source summaries, and can ultimately omit the flat listing while retaining search.">
 
 {/* mermaid-equivalent source:
    budget = min(5% ctx, 4000 tok)
    tier1[name + ≤60-char desc] --fits?--> done
    tier1 --no--> tier2[names only] --fits?--> done
-   tier2 --no--> tier3[one line per server]
+   tier2 --no--> tier3[source summaries or no flat listing]
 */}
 
 <svg viewBox="0 0 656 250" role="img" aria-labelledby="tb3t tb3d">
   <title id="tb3t">Hermes tiered tool listing</title>
-  <desc id="tb3d">Three boxes in a row, connected by arrows labelled no fit. Tier one: every tool name plus a description up to sixty characters. Tier two: names only. Tier three: one line per MCP server. A budget label above reads min of five percent of context or four thousand tokens. A note beneath cites Cloudflare with about 3,300 tools as the documented tier-two case.</desc>
+  <desc id="tb3d">Three boxes in a row, connected by arrows labelled no fit. The first shows tool names plus short descriptions. The second shows names only. The third represents mixed per-source detail, source summaries, or no flat listing. Search remains available throughout under a budget of the smaller of five percent of context or four thousand tokens.</desc>
 
   <defs>
     <marker id="tb3a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -495,19 +481,19 @@ The piece I want you to copy is how Hermes keeps the 50,000 **visible** without 
   <text class="f-sub" x="418" y="78">no fit</text>
 
   <rect class="f-box" x="440" y="40" width="192" height="96" rx="2" />
-  <text class="f-t" x="452" y="62">tier 3</text>
-  <text class="f-sub" x="452" y="84">one line per server</text>
-  <text class="f-sub" x="452" y="100">category survives</text>
-  <text class="f-sub" x="452" y="122">kubernetes · 850 tools</text>
+  <text class="f-t" x="452" y="62">later tiers</text>
+  <text class="f-sub" x="452" y="84">mixed source detail</text>
+  <text class="f-sub" x="452" y="100">source summaries, then none</text>
+  <text class="f-sub" x="452" y="122">search control still survives</text>
 
   <path class="f-div f-dash" d="M0 158 L632 158" />
-  <text class="f-sub" x="0" y="182">documented tier-2 case: Cloudflare MCP, ≈3,300 tools, ≈32k tokens for names alone</text>
-  <text class="f-accent" x="0" y="206">the model always knows a capability exists, even when it cannot see its schema</text>
-  <text class="f-sub" x="0" y="230">our company lands in tier 3: 100 lines, one per server</text>
+  <text class="f-sub" x="0" y="182">a documented ≈3,300-tool Cloudflare case motivates the degradation ladder</text>
+  <text class="f-accent" x="0" y="206">boundedness is guaranteed; per-tool visibility at extreme scale is not</text>
+  <text class="f-sub" x="0" y="230">the 50,000-tool thought experiment needs retrieval evaluation, not confidence by analogy</text>
 </svg>
 </Figure>
 
-With 50,000 tools our company lands in tier three. The model sees roughly "kubernetes: 850 tools, datadog: 600 tools, clickup: 300 tools" and knows those places exist. It cannot say "I don't have access to Kubernetes". That is Failure A, killed for the price of a hundred short lines.
+At 50,000 tools, the flat catalog may degrade to source summaries or disappear altogether. The model still sees the search control, and may see hints such as "kubernetes: 850 tools," but the implementation does not guarantee that every source or operation remains advertised. Hermes proves a bounded operating posture; it does not prove retrieval accuracy at 50,000 or 100,000 tools.
 
 Search is BM25 over name, server, description, and top-level parameter names, with a substring fallback. The catalog is rebuilt on every assembly rather than cached per session, and it is scoped to the session's toolset, so a subagent cannot search outside what it was granted.
 
@@ -536,11 +522,11 @@ MODEL  search → describe → call   for clickup
 MODEL  search → describe → call   for slack
 ```
 
-Notice the extra step. Codex and Claude Code go **search, reference, exact call**. Hermes goes **search, describe, generic call**, and the harness unwraps `tool_call` into the real operation. The model never receives Kubernetes as a first-class provider tool. We will come back to why that matters.
+Notice the extra step. Codex goes **search, typed schema-bearing load, exact call**; Claude Code goes **search, compact reference, exact call**. Hermes goes **search, describe, generic call**, and the harness unwraps `tool_call` into the real operation. The model never receives Kubernetes as a first-class provider tool. We will come back to why that matters.
 
 Hermes deliberately skips Code Mode, citing "large surface area".
 
-**Skills** are about 197 in-tree files. The index lives in the *volatile* tier of the system prompt with a 60-character description limit. The body is loaded by `skill_view` and arrives as a tool result, never in the system prompt. The instruction wording is mandatory-load: scan the index, load if even partially relevant. After compaction a `[SKILL_PRUNED]` marker tells the model to reload. A coding posture may demote categories to names-only, but names are never deleted.
+**Skills** live in a separate catalog. The index occupies the *volatile* tier of the system prompt with short descriptions, while the body is loaded by `skill_view` and arrives as a tool result. After compaction a `[SKILL_PRUNED]` marker tells the model to reload. As with tool advertising, bounded metadata can degrade, so good names and explicit reload behavior matter.
 
 **Plugins** in Hermes can register tools, hooks, slash commands, and skills, and can call configured MCP servers. Non-core plugin tools join the deferred catalog alongside MCP tools. Core stays eager.
 
@@ -557,24 +543,24 @@ Finally, the **Footprint Ladder**. When someone wants to add a capability, the c
 
 That ladder is a cultural answer to a technical problem. Most capability sprawl is people reaching for rung six when rung two would do.
 
-## DeepSeek Harness: one door instead of a thousand
+## DeepSeek Harness: one door after selection
 
-DeepSeek Harness makes everything a plugin, including the tool registry, the system-prompt assembler, skills, MCP, and compaction. Its answer to 50,000 tools is different in kind from the other three: **Code Mode**.
+DeepSeek Harness makes everything a plugin, including the tool registry, the system-prompt assembler, skills, MCP, and compaction. **Code Mode** changes how a bounded tool set is presented and composed; it does not solve catalog selection by itself.
 
-Tools have a presentation mode: `native`, `code`, or `both`. In `native`, the model sees the full schema list, and the README effectively says that still costs full schemas for a large MCP set. In `code`, the model sees exactly one reserved tool, `run_code`, plus a generated SDK section describing the available functions as code. The model writes a script that calls those functions. Nested dispatches inside the sandbox may call every visible tool. Direct calls to any name other than `run_code` are denied.
+Tools have a presentation mode: `native`, `code`, or `both`. In `code`, the top-level callable list collapses to one reserved tool, `run_code`, but a generated SDK section still contains the input and output signatures for **every selected visible tool**. That prompt remains O(N), so a 50,000-tool registry must be narrowed before generation. The model writes a script against the selected SDK, and every nested invocation must re-enter the same exact dispatcher, policy checks, and journal as a direct call.
 
-<Figure n="04" caption="Under Code Mode the model sees one door. It writes a script; the script calls many tools; only the script's logs and return value come back into the conversation.">
+<Figure n="04" caption="Code Mode gives the model one callable door, but the prompt still contains SDK signatures for the bounded selected set. Ordinary intermediate results usually stay inside the runtime.">
 
 {/* mermaid-equivalent source:
    model --> run_code(script)
-   run_code --> sandbox
-   sandbox --> toolA, toolB, toolC (nested dispatch, results stay inside)
-   sandbox --> return_value --> conversation
+   run_code --> isolated runtime
+   isolated runtime --> toolA, toolB, toolC (nested dispatch)
+   isolated runtime --> return_value --> conversation
 */}
 
 <svg viewBox="0 0 656 300" role="img" aria-labelledby="tb4t tb4d">
   <title id="tb4t">DeepSeek Harness Code Mode</title>
-  <desc id="tb4d">On the left, the model holds a single tool called run_code and an SDK description. It sends a script into a sandbox box in the centre. Inside the sandbox, the script fans out to several tools: get_rollout, query_logs, create_task, and more; their results loop back into the script and are labelled as never entering the conversation. On the right, one small box labelled logs and return value is the only thing that flows back to the model.</desc>
+  <desc id="tb4d">On the left, the model holds a single callable tool called run_code plus generated SDK signatures for a bounded selected set. It sends a script into an isolated runtime in the centre. Nested calls re-enter exact dispatch. Ordinary intermediate results usually remain inside, while logs and a return value flow back; some image results or additional contexts may also be forwarded.</desc>
 
   <defs>
     <marker id="tb4a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -586,7 +572,7 @@ Tools have a presentation mode: `native`, `code`, or `both`. In `native`, the mo
   </defs>
 
   <text class="f-g" x="0" y="16">model sees</text>
-  <text class="f-g" x="230" y="16">sandbox</text>
+  <text class="f-g" x="230" y="16">isolated runtime</text>
   <text class="f-g" x="500" y="16">comes back</text>
 
   <rect class="f-box f-box--accent" x="0" y="30" width="180" height="90" rx="2" />
@@ -594,7 +580,7 @@ Tools have a presentation mode: `native`, `code`, or `both`. In `native`, the mo
   <text class="f-accent" x="90" y="52">only tool</text>
   <text class="f-sub" x="12" y="74">+ SDK prompt section:</text>
   <text class="f-sub" x="12" y="90">k8s.getRollout(), datadog.query()…</text>
-  <text class="f-sub" x="12" y="106">described as code, not schemas</text>
+  <text class="f-sub" x="12" y="106">selected signatures still cost O(N)</text>
 
   <path class="f-edge--accent" marker-end="url(#tb4aa)" d="M180 75 L226 75" />
   <text class="f-accent" x="184" y="66">script</text>
@@ -616,10 +602,10 @@ Tools have a presentation mode: `native`, `code`, or `both`. In `native`, the mo
   <text class="f-sub" x="406" y="134">create_task</text>
 
   <path class="f-edge f-dash" d="M277 150 L277 172 L433 172 L433 150" />
-  <text class="f-sub" x="244" y="196">nested dispatch may call every visible tool</text>
-  <text class="f-accent" x="244" y="216">intermediate results stay in here</text>
+  <text class="f-sub" x="244" y="196">each nested call re-enters exact dispatch</text>
+  <text class="f-accent" x="244" y="216">ordinary intermediate results stay here</text>
   <text class="f-sub" x="244" y="236">loop · filter · join · retry, in code</text>
-  <text class="f-sub" x="244" y="256">up to 98.7% fewer tokens (Anthropic post)</text>
+  <text class="f-sub" x="244" y="256">bounded composition keeps chat smaller</text>
 
   <path class="f-edge--accent" marker-end="url(#tb4aa)" d="M480 150 L520 150" />
 
@@ -627,14 +613,16 @@ Tools have a presentation mode: `native`, `code`, or `both`. In `native`, the mo
   <text class="f-t" x="512" y="142">logs +</text>
   <text class="f-t" x="512" y="160">return value</text>
 
-  <text class="f-sub" x="500" y="200">one tool result</text>
-  <text class="f-sub" x="500" y="216">in the conversation</text>
+  <text class="f-sub" x="500" y="200">usually one result</text>
+  <text class="f-sub" x="500" y="216">plus forwarded rich context</text>
 </svg>
 </Figure>
 
-The kid version: instead of a thousand tools, you carry one magic pen. You write down what you want done, and the pen goes and uses the workshop for you. It only tells you the answer, not every hammer swing.
+The kid version: you carry one magic pen, but you must also carry an instruction card for every workshop tool the pen may use. First choose a small enough workshop shelf; then let the pen combine those tools without narrating every hammer swing.
 
 ### DeepSeek Harness runs the incident
+
+Assume an earlier admission step has already selected the handful of incident tools below their signatures fit in the SDK prompt:
 
 ```text
 MODEL  skill catalog (user-role reminder) → skill({name:"incident-response"})
@@ -653,7 +641,7 @@ MODEL  run_code(`
        → { verdict: "provider rate limits", taskUrl: "…", errorCount: 4120, rateLimited: 3880 }
 ```
 
-One tool call. Six MCP operations across four servers ran inside the sandbox. The 4,120 error records never entered the conversation. Only the return value did. That is the harness's primary answer to hundreds of tools and MCP servers.
+One top-level call composes six operations across four servers. Ordinary log records can stay inside the runtime and only a bounded return value needs to enter the conversation. But Code Mode did not find these operations: preselection did, and their SDK signatures were still in the prompt. A worker thread or language runtime is also not automatically a security sandbox; filesystem, network, process, time, memory, secret, and nested-call boundaries need independent enforcement.
 
 **MCP** runs as one plugin instance per server, registering tools as `mcp__<server>__<name>`. On `tools/list_changed` it does a generational swap rather than accumulating, so stale tools cannot pile up.
 
@@ -667,17 +655,17 @@ Why user-role? Because the system prefix is the most valuable cached bytes in th
 
 Strip away everything else and three shapes remain.
 
-<Figure n="05" caption="Three ways to finish discovery. Codex and Claude Code hand the model an exact tool. Hermes hands it a name and a schema and asks it to build a generic call. DeepSeek asks it to write code.">
+<Figure n="05" caption="Three ways to finish activation. Codex and Claude both produce an exact callable tool through different typed protocols; Hermes uses an ordinary describe result and generic call; DeepSeek-style Code Mode composes an already-selected set in code.">
 
 {/* mermaid-equivalent source:
-   codex/claude: search --> reference --> exact call
+   codex/claude: search --> typed activation --> exact call
    hermes:       search --> describe --> tool_call(name,args) --> unwrap --> exact tool
-   deepseek:     run_code(script) --> sandbox --> exact tools
+   deepseek:     run_code(script) --> isolated runtime --> exact tools
 */}
 
 <svg viewBox="0 0 656 330" role="img" aria-labelledby="tb5t tb5d">
   <title id="tb5t">Three discovery protocols</title>
-  <desc id="tb5d">Three horizontal rows. Row one, Codex and Claude Code: search, then reference, then exact call, three boxes. Row two, Hermes: search, describe, generic tool_call with name and args, harness unwraps, exact tool executes, five boxes with the model-side portion bracketed as a state machine the model must carry. Row three, DeepSeek Harness: run_code with a script, sandbox, exact tools, three boxes. A footer notes that the row-two extra steps are provider-neutral but cost a small model more.</desc>
+  <desc id="tb5d">Three horizontal rows. Row one, Codex and Claude Code: search, typed native activation, then exact call. Codex carries a matched schema in its typed output while Claude uses a compact reference. Row two, Hermes: search, describe, generic tool_call with name and arguments, harness unwraps, exact tool executes. Row three, DeepSeek Harness: run_code composes an already-selected SDK surface in an isolated runtime.</desc>
 
   <defs>
     <marker id="tb5a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -693,14 +681,14 @@ Strip away everything else and three shapes remain.
   <text class="f-t" x="12" y="54">search</text>
   <path class="f-edge--accent" marker-end="url(#tb5aa)" d="M120 50 L142 50" />
   <rect class="f-box f-box--accent" x="146" y="28" width="150" height="44" rx="2" />
-  <text class="f-t" x="158" y="47">reference</text>
-  <text class="f-accent" x="158" y="63">lands in suffix</text>
+  <text class="f-t" x="158" y="47">typed activation</text>
+  <text class="f-accent" x="158" y="63">schema or reference</text>
   <path class="f-edge" marker-end="url(#tb5a)" d="M296 50 L318 50" />
   <rect class="f-box" x="322" y="28" width="150" height="44" rx="2" />
   <text class="f-t" x="334" y="47">exact tool call</text>
   <text class="f-sub" x="334" y="63">k8s.get_rollout(args)</text>
   <text class="f-sub" x="486" y="47">provider must</text>
-  <text class="f-sub" x="486" y="63">understand references</text>
+  <text class="f-sub" x="486" y="63">understand native items</text>
 
   <text class="f-g" x="0" y="112">hermes</text>
   <rect class="f-box" x="0" y="124" width="96" height="44" rx="2" />
@@ -730,13 +718,13 @@ Strip away everything else and three shapes remain.
   <text class="f-accent" x="12" y="283">one door</text>
   <path class="f-edge" marker-end="url(#tb5a)" d="M150 270 L172 270" />
   <rect class="f-box" x="176" y="248" width="120" height="44" rx="2" />
-  <text class="f-t" x="188" y="267">sandbox</text>
+  <text class="f-t" x="188" y="267">code runtime</text>
   <text class="f-sub" x="188" y="283">loops, joins</text>
   <path class="f-edge" marker-end="url(#tb5a)" d="M296 270 L318 270" />
   <rect class="f-box" x="322" y="248" width="150" height="44" rx="2" />
   <text class="f-t" x="334" y="267">exact tools</text>
   <text class="f-sub" x="334" y="283">results stay inside</text>
-  <text class="f-sub" x="486" y="267">needs a sandbox and</text>
+  <text class="f-sub" x="486" y="267">needs preselection and</text>
   <text class="f-sub" x="486" y="283">reliable code generation</text>
 
   <text class="f-sub" x="0" y="322">all three: 50,000 registered ≠ 50,000 in context</text>
@@ -745,7 +733,7 @@ Strip away everything else and three shapes remain.
 
 The difference between rows one and two looks tiny. It is not.
 
-**Row one is easy for the model and hard for the provider.** After search, the model's next decision is one plain function call with an exact schema in front of it. But the provider has to understand what a reference *is*. Move to a proxy or an older model and Codex and Claude Code fall back to eager schemas.
+**Row one is easy for the model and hard for the provider.** After search, the model's next decision is one exact function call. But the provider has to understand its native typed activation item. Codex and Claude use different items, and unsupported providers need a bounded portable fallback—not the entire eager catalog.
 
 **Row two is easy for the provider and harder for the model.** Any model that can call a function can call `tool_search`, `tool_describe`, and `tool_call`. But look at what the model must hold across generation boundaries after `describe` returns:
 
@@ -757,35 +745,35 @@ construct  tool_call(name="mcp_crm_create_contact", arguments={...})
 
 That is a small protocol state machine. For a frontier model, trivial. For a cheap 20 to 30 billion parameter open model, it is three more places to make a mistake, and the study that produced these notes flags exactly this as Hermes' cost. Codex and Claude Code collapse that state machine into "here is `create_contact(firstName, locationId, email)`, call it".
 
-**Row three is easy for the transcript and hard for everything else.** One call, nothing intermediate in context. But you need a sandbox, the model must write correct code, and a script that fails halfway has no rollback.
+**Row three is easy for the transcript and hard elsewhere.** One call can suppress ordinary intermediate results, but the model still sees the selected SDK signatures, must write correct code, and needs a genuinely isolated runtime. A script that fails halfway also has no automatic rollback.
 
 So the honest summary is:
 
 <Callout label="who wins what">
-Hermes has the better answer for **"how do I find one operation among 50,000, on any model?"** Codex and Claude Code have the better answer for **"once I found it, how do I hand it to the model?"** DeepSeek has the better answer for **"how do I run twenty operations without twenty results in context?"**
+Hermes has the most provider-portable answer for **"how do I search a large session-scoped catalog?"**—but retrieval accuracy at 50,000 operations is not proven. Codex and Claude Code have the cleaner answer for **"once I found it, how do I hand the exact tool to the model?"** DeepSeek-style Code Mode has the strongest composition shape for **"how do I run several already-selected operations without putting every ordinary intermediate result in context?"**
 </Callout>
 
 ## Four bags, side by side
 
 | | Codex | Claude Code | Hermes Agent | DeepSeek Harness |
 |---|---|---|---|---|
-| **Core tools** | Direct exposure | Eager builtins | 59 named core, never deferred | Native, or hidden behind `run_code` |
-| **MCP at scale** | Deferred + BM25 `tool_search` | Deferred by default + `ToolSearch` | `tool_search` / `describe` / `call` bridge, BM25 | Code Mode: one `run_code` tool |
-| **Result of discovery** | Namespace reference in suffix | `tool_reference` in suffix | Tool name + metadata | n/a, functions in SDK prompt |
-| **Get the schema** | Native, via reference | Native, API expands reference | `tool_describe` | SDK section |
-| **Execution** | Exact native tool | Exact native tool | `tool_call(name, args)`, harness unwraps | Script calls tools in sandbox |
-| **Provider dependence** | High | High | Low | Low, needs sandbox |
-| **Visibility guard** | Namespace name + first line, 4 KiB | Names + server instructions, 2 KiB each | Tiered listing, min(5%, 4k tokens), names never dropped | SDK lists functions as code |
+| **Core tools** | Direct exposure | Eager builtins | Normally eager, subject to defer overrides | Native, or replaced by `run_code` in code presentation |
+| **MCP at scale** | Deferred + client BM25 `tool_search` | Prefiltered/partitioned request + `defer_loading` and `ToolSearch` | Session-scoped `tool_search` / `describe` / `call` bridge | Requires bounded preselection; Code Mode is presentation, not catalog search |
+| **Result of discovery** | Typed `tool_search_output` carrying matched schema | Compact `tool_reference` | Tool name + metadata | No discovery primitive in the studied code path |
+| **Get the schema** | Matched schema is in the typed load item | API expands the reference | Ordinary `tool_describe` result | Generated SDK section for selected tools |
+| **Execution** | Exact namespaced tool | Exact native tool | `tool_call(name, args)`, harness unwraps | Script calls selected tools through the runtime |
+| **Provider dependence** | High | High | Low | Low at protocol level; needs certified isolation |
+| **Visibility guard** | Bounded namespace guidance | Bounded routing guidance for admitted candidates | Degradation ladder under min(5%, 4k tokens), possibly no flat listing | SDK lists all selected signatures and remains O(N) |
 | **Skill index** | Name + desc + locator, 2% budget, round-robin trim | Name + desc, 1% budget, trim least-used first | 60-char desc in volatile tier | Sorted name + ~500-char desc, user-role message |
 | **Skill body** | Read `SKILL.md`, 8 KB cap | Injected as one message | `skill_view` tool result | `skill()` tool result |
 | **Big results** | Truncate with size note | Spill to disk above 25k tokens | Per-tool result budgets | Spill: preview + locator |
 | **After compaction** | Re-inject initial context + catalog | Re-inject `CLAUDE.md`, memory, 5 files, skills ≤25k | `[SKILL_PRUNED]` → reload | Next snapshot re-injects catalog |
-| **Model sees 50k schemas?** | No | No | No | No |
-| **Known gap** | Eager fallback on unsupported provider | No searched skill index | Generic executor taxes small models | Code Mode needs sandbox, no rollback |
+| **Model sees 50k schemas?** | Not initially; matched schemas enter typed history | No, and one request admits at most 10k deferred definitions | No | It must not: selection has to happen before SDK generation |
+| **Known gap** | Native path needs compatible provider; matched-schema history cost | Candidate schemas still cross the wire; 10k ceiling | Generic executor taxes small models; extreme-scale recall unproven | SDK is O(N); isolation and rollback are external responsibilities |
 
-Notice how much they agree. Nobody dumps MCP schemas. Nobody puts skill bodies in the system prompt. Everyone keeps a small always-on core. Everyone makes discovery land in the suffix. Everyone restores durable layers after compaction instead of trusting a summary to remember them.
+Notice the shared direction: the registered universe should not become the model's initial schema view; procedural skill bodies should load on demand; results need bounds; and compaction cannot be the authority for capabilities. The implementations do **not** agree on wire cost, typed history, preselection, or whether discovery exists at all.
 
-They disagree on **how to finish**. Reference, generic call, or code.
+They disagree on **how to finish**: schema-bearing typed load, compact reference, generic call, or code over an already-selected SDK.
 
 ## Discovery happens at four levels, and the model should see one
 
@@ -822,32 +810,33 @@ Plugins sit one level above skills and tools, and they should stay there. Instal
 
 ## What none of them has solved
 
-All four handle *tools* at scale better than *skills* at scale. The skill catalogs are bounded and eager, not searched. Codex trims descriptions round-robin and drops the tail. Claude Code strips descriptions from least-used skills until only names remain. Hermes caps at 60 characters. DeepSeek caps at about 500. Our 250 skills fit fine everywhere. At 2,500, every one of these gets shaky, because a name-only entry is a weak routing signal.
+The studied mechanisms handle *tool schemas* more deliberately than they handle very large *skill catalogs*. Skill metadata is bounded and eager rather than production-routed through search. Codex can trim descriptions and eventually drop tail entries; Claude Code can strip descriptions until only names remain; Hermes and DeepSeek also cap their advertisements. Our hypothetical 250 skills may fit, but at 2,500 a name-only entry is a weak routing signal.
 
 The honest extension, which none of these ships in production yet, is a searched skill index that still keeps a tiny category-and-name listing visible, so the search itself is discoverable. Codex has the BM25 selectors in shadow mode. That is the closest anyone is.
 
-And every search-based design still carries the Anthropic number: 49% to 74% with tool search on Opus 4 is a big win and still a quarter of retrieval failures. Search does not make the model choose right. It makes choosing possible.
+Search does not make the model choose correctly. It only makes choosing possible. Large-catalog retrieval therefore needs explicit recall, abstention, first-call validity, and end-to-end success evaluation for each exact model and provider build.
 
 ## If you are building one
 
 Pack the bag like this. It is a hybrid, and the study these notes come from lands on the same one.
 
-**Keep from Hermes:** server-side federated search over everything, a bounded advertisement that spends its budget on existence before description, provider neutrality, and session-scoped authorization so a subagent cannot search outside its grant.
+**Keep from Hermes:** bounded BM25 search over the session-scoped toolset, deterministic advertisement degradation, and provider neutrality. Hermes performs that search in the harness process; moving it to a shared server-side federated index is an architectural adaptation for a distributed system, not observed Hermes behavior.
 
-**Keep from Codex and Claude Code:** exact schemas, exact activation, native execution of the found tool, and references that persist in history so the second use is free.
+**Keep from Codex and Claude Code:** exact schemas, typed activation, and native execution of the found tool. Retained provider state can avoid repeated discovery, but persist canonical capability identity and revisions separately so compaction or failover can reconstruct it.
 
-**Keep from DeepSeek:** the skill catalog as a conversation message rather than a prefix mutation, spill for oversized results, and Code Mode when your tools are composable APIs and you have a sandbox.
+**Keep from DeepSeek:** the skill catalog as a conversation message rather than a prefix mutation, spill for oversized results, and Code Mode for a bounded selected set when the model, isolation profile, policy, cancellation, and evidence handling have been certified.
 
 **Then the checklist.**
 
 1. **Keep a narrow core.** Tens of tools, direct, paid every turn, and be stingy about who gets in. Try a CLI plus a skill before a new tool.
-2. **Defer the rest behind a visible index.** Name and one line, under a hard budget. Never let a capability become invisible.
+2. **Defer the rest behind bounded search.** Keep the search control visible and advertise categories or names within a hard budget; do not pretend every operation can stay individually visible forever.
 3. **Search only when necessary, then activate the exact operation.** The model should end up calling `create_task(...)`, not `tool_call("clickup_create_task", ...)`.
-4. **Return references, not schemas, into the suffix.** The tool prefix must stay byte-identical.
+4. **Use typed activation without mutating the top-level tool prefix.** Do not dump JSON Schema as prose. Be explicit about remaining costs: Codex can carry the matched schema in structured history, while Claude carries admitted candidate schemas in the API `tools` collection.
 5. **Skills are documents.** Index them, load them into a tool result, re-attach the loaded ones after compaction.
 6. **Spill big results to disk.** Preview plus locator. The transcript is an attention budget, not an archive.
 7. **Restore, do not summarize, the durable layers.** Repo instructions, skill catalog, environment state.
 8. **Resolve plumbing outside the model.** Plugins, connections, accounts, schema revisions, authorization. Show the model one function.
+9. **Treat discovery as discovery, not permission.** Recheck live authorization, connection readiness, schema compatibility, approval, and idempotency at dispatch.
 
 The kid version of all of it: carry the card catalog, not the library. Know what you own. Fetch the book when you need it. Read the exact page, not a note about which page. Put it back when you are done.
 
